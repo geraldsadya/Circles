@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circle - Apple Design Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: #f2f2f7;
+            color: #1d1d1f;
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .phone-container {
+            max-width: 375px;
+            margin: 20px auto;
+            background: #000;
+            border-radius: 40px;
+            padding: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        
+        .screen {
+            background: #ffffff;
+            border-radius: 32px;
+            height: 812px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .status-bar {
+            height: 44px;
+            background: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        
+        .nav-bar {
+            height: 60px;
+            background: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 0.5px solid #c6c6c8;
+        }
+        
+        .nav-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        
+        .nav-button {
+            background: #5856d6;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            width: 32px;
+            height: 32px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .content {
+            height: calc(100% - 104px);
+            overflow-y: auto;
+            padding: 20px;
+            background: #f2f2f7;
+        }
+        
+        .welcome-section {
+            margin-bottom: 30px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .greeting {
+            font-size: 17px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            font-weight: 400;
+        }
+        
+        .name {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+        }
+        
+        .subtitle {
+            font-size: 15px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #5856d6, #af52de);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            float: right;
+            margin-top: -60px;
+            font-weight: 500;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #8e8e93;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        
+        .section-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1d1d1f;
+        }
+        
+        .challenge-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .challenge-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .challenge-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .challenge-title {
+            font-size: 15px;
+            font-weight: 600;
+            flex: 1;
+            color: #1d1d1f;
+        }
+        
+        .challenge-due {
+            font-size: 11px;
+            color: #ff3b30;
+            background: #ffebee;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e5e5ea;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 12px 0 8px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #5856d6;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 11px;
+            color: #8e8e93;
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 0.5px solid #f2f2f7;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            font-size: 16px;
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .activity-text {
+            flex: 1;
+            font-size: 14px;
+            color: #1d1d1f;
+            font-weight: 400;
+        }
+        
+        .tab-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 83px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 0.5px solid #c6c6c8;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: color 0.2s;
+            color: #8e8e93;
+        }
+        
+        .tab-item.active {
+            color: #5856d6;
+        }
+        
+        .tab-icon {
+            font-size: 18px;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        
+        .tab-label {
+            font-size: 10px;
+            font-weight: 500;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .hangout-status {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .hangout-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .hangout-text {
+            font-size: 15px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .circle-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .circle-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .circle-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .circle-title {
+            font-size: 15px;
+            font-weight: 600;
+            flex: 1;
+            color: #1d1d1f;
+        }
+        
+        .circle-meta {
+            font-size: 13px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            font-weight: 400;
+        }
+        
+        .circle-activity {
+            font-size: 11px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .member-avatars {
+            display: flex;
+            gap: 6px;
+            margin-top: 12px;
+        }
+        
+        .member-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .ranking-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .ranking-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .rank-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .rank-info {
+            flex: 1;
+        }
+        
+        .rank-position {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 2px;
+        }
+        
+        .rank-name {
+            font-size: 13px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .rank-points {
+            font-size: 13px;
+            color: #8e8e93;
+            font-weight: 500;
+        }
+        
+        .profile-header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, #5856d6, #af52de);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            margin: 0 auto 16px;
+            font-weight: 500;
+        }
+        
+        .profile-name {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #1d1d1f;
+        }
+        
+        .profile-email {
+            font-size: 15px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            font-weight: 400;
+        }
+        
+        .profile-join {
+            font-size: 13px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .achievement-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 0.5px solid #e5e5ea;
+        }
+        
+        .achievement-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .achievement-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .achievement-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+        
+        .achievement-desc {
+            font-size: 13px;
+            color: #8e8e93;
+            font-weight: 400;
+        }
+        
+        .settings-item {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 0.5px solid #e5e5ea;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .settings-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .settings-text {
+            font-size: 15px;
+            font-weight: 400;
+            color: #1d1d1f;
+            flex: 1;
+        }
+        
+        .settings-arrow {
+            font-size: 14px;
+            color: #c7c7cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="screen">
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>🔋 100%</span>
+            </div>
+            
+            <!-- Navigation Bar -->
+            <div class="nav-bar">
+                <div class="nav-title">Circle</div>
+                <button class="nav-button" onclick="showNewChallenge()">+</button>
+            </div>
+            
+            <!-- Content -->
+            <div class="content">
+                <!-- Home Tab -->
+                <div id="home-tab" class="tab-content">
+                    <div class="welcome-section">
+                        <div class="greeting">Good morning</div>
+                        <div class="name">Alex</div>
+                        <div class="subtitle">Ready to prove it today?</div>
+                        <div class="avatar">👤</div>
+                        <div style="clear: both;"></div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">3</div>
+                            <div class="stat-label">Active Challenges</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">150</div>
+                            <div class="stat-label">Points This Week</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">2</div>
+                            <div class="stat-label">Hours Hangouts</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">Active Challenges</div>
+                    
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <div class="challenge-icon">🏋️</div>
+                            <div class="challenge-title">Gym 4x this week</div>
+                            <div class="challenge-due">2 days left</div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 80%"></div>
+                        </div>
+                        <div class="progress-text">80% complete</div>
+                    </div>
+                    
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <div class="challenge-icon">🏃</div>
+                            <div class="challenge-title">Walk 10k steps daily</div>
+                            <div class="challenge-due">Today</div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 70%"></div>
+                        </div>
+                        <div class="progress-text">70% complete</div>
+                    </div>
+                    
+                    <div class="section-title">Recent Activity</div>
+                    
+                    <div class="challenge-card">
+                        <div class="activity-item">
+                            <div class="activity-icon">✅</div>
+                            <div class="activity-text">Completed gym visit</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">🏆</div>
+                            <div class="activity-text">Earned 10 points</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">👥</div>
+                            <div class="activity-text">Hangout with Sarah (45 min)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="hangout-status">
+                        <div style="display: flex; align-items: center;">
+                            <div class="hangout-icon">📍</div>
+                            <div class="hangout-text">No friends nearby<br>Last seen: Sarah (2 hours ago)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Circles Tab -->
+                <div id="circles-tab" class="tab-content hidden">
+                    <div class="section-title">My Circles</div>
+                    
+                    <div class="circle-card">
+                        <div class="circle-header">
+                            <div class="circle-icon">🏋️</div>
+                            <div class="circle-title">Sunday Lifts</div>
+                        </div>
+                        <div class="circle-meta">4 members • 12 active challenges</div>
+                        <div class="circle-activity">Last activity: 2 hours ago</div>
+                        <div class="member-avatars">
+                            <div class="member-avatar" style="background: #5856d6;">👤</div>
+                            <div class="member-avatar" style="background: #34c759;">👤</div>
+                            <div class="member-avatar" style="background: #ff9500;">👤</div>
+                            <div class="member-avatar" style="background: #af52de;">👤</div>
+                        </div>
+                    </div>
+                    
+                    <div class="circle-card">
+                        <div class="circle-header">
+                            <div class="circle-icon">🎓</div>
+                            <div class="circle-title">Study Group</div>
+                        </div>
+                        <div class="circle-meta">6 members • 8 active challenges</div>
+                        <div class="circle-activity">Last activity: 1 day ago</div>
+                        <div class="member-avatars">
+                            <div class="member-avatar" style="background: #5856d6;">👤</div>
+                            <div class="member-avatar" style="background: #34c759;">👤</div>
+                            <div class="member-avatar" style="background: #ff9500;">👤</div>
+                            <div class="member-avatar" style="background: #af52de;">👤</div>
+                        </div>
+                    </div>
+                    
+                    <div class="circle-card">
+                        <div class="circle-header">
+                            <div class="circle-icon">🏃</div>
+                            <div class="circle-title">Running Club</div>
+                        </div>
+                        <div class="circle-meta">3 members • 5 active challenges</div>
+                        <div class="circle-activity">Last activity: 3 days ago</div>
+                        <div class="member-avatars">
+                            <div class="member-avatar" style="background: #5856d6;">👤</div>
+                            <div class="member-avatar" style="background: #34c759;">👤</div>
+                            <div class="member-avatar" style="background: #ff9500;">👤</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Leaderboard Tab -->
+                <div id="leaderboard-tab" class="tab-content hidden">
+                    <div class="section-title">This Week Rankings</div>
+                    
+                    <div class="ranking-card">
+                        <div class="ranking-header">
+                            <div class="rank-icon">👑</div>
+                            <div class="rank-info">
+                                <div class="rank-position">1st - Sarah</div>
+                                <div class="rank-name">245 points</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="ranking-card">
+                        <div class="ranking-header">
+                            <div class="rank-icon">🥈</div>
+                            <div class="rank-info">
+                                <div class="rank-position">2nd - Mike</div>
+                                <div class="rank-name">198 points</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 80%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="ranking-card">
+                        <div class="ranking-header">
+                            <div class="rank-icon">🥉</div>
+                            <div class="rank-info">
+                                <div class="rank-position">3rd - Alex</div>
+                                <div class="rank-name">156 points</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 64%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="ranking-card" style="background: #f8f9ff;">
+                        <div class="ranking-header">
+                            <div class="rank-icon">4th</div>
+                            <div class="rank-info">
+                                <div class="rank-position">You</div>
+                                <div class="rank-name">134 points</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 55%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Challenges Tab -->
+                <div id="challenges-tab" class="tab-content hidden">
+                    <div class="section-title">My Challenges</div>
+                    
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <div class="challenge-icon">🏋️</div>
+                            <div class="challenge-title">Gym 4x this week</div>
+                            <div class="challenge-due">2 days left</div>
+                        </div>
+                        <div style="font-size: 12px; color: #8e8e93; margin-bottom: 10px;">Created by: Sarah</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 80%"></div>
+                        </div>
+                        <div class="progress-text">✅ ✅ ✅ ⏳</div>
+                    </div>
+                    
+                    <div class="challenge-card">
+                        <div class="challenge-header">
+                            <div class="challenge-icon">🏃</div>
+                            <div class="challenge-title">Walk 10k steps daily</div>
+                            <div class="challenge-due">Today</div>
+                        </div>
+                        <div style="font-size: 12px; color: #8e8e93; margin-bottom: 10px;">Created by: You</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 70%"></div>
+                        </div>
+                        <div class="progress-text">✅ ✅ ✅ ✅ ⏳</div>
+                    </div>
+                </div>
+                
+                <!-- Profile Tab -->
+                <div id="profile-tab" class="tab-content hidden">
+                    <div class="profile-header">
+                        <div class="profile-avatar">👤</div>
+                        <div class="profile-name">Alex</div>
+                        <div class="profile-email">alex@example.com</div>
+                        <div class="profile-join">Member since Jan 2024</div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">45</div>
+                            <div class="stat-label">Challenges Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">1,234</div>
+                            <div class="stat-label">Total Points</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">23</div>
+                            <div class="stat-label">Hangouts This Month</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">Recent Activity</div>
+                    <div class="challenge-card">
+                        <div class="activity-item">
+                            <div class="activity-icon">✅</div>
+                            <div class="activity-text">Completed gym challenge</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">🏆</div>
+                            <div class="activity-text">Earned 10 points</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-icon">👥</div>
+                            <div class="activity-text">Hangout with Sarah (45 min)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section-title">Settings</div>
+                    <div class="settings-item">
+                        <div class="settings-icon">🔒</div>
+                        <div class="settings-text">Privacy & Data</div>
+                        <div class="settings-arrow">›</div>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-icon">🔔</div>
+                        <div class="settings-text">Notifications</div>
+                        <div class="settings-arrow">›</div>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-icon">📊</div>
+                        <div class="settings-text">Circle Wrapped</div>
+                        <div class="settings-arrow">›</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <div class="tab-item active" onclick="switchTab(0)">
+                    <div class="tab-icon">🏠</div>
+                    <div class="tab-label">Home</div>
+                </div>
+                <div class="tab-item" onclick="switchTab(1)">
+                    <div class="tab-icon">👥</div>
+                    <div class="tab-label">Circles</div>
+                </div>
+                <div class="tab-item" onclick="switchTab(2)">
+                    <div class="tab-icon">🏆</div>
+                    <div class="tab-label">Leaderboard</div>
+                </div>
+                <div class="tab-item" onclick="switchTab(3)">
+                    <div class="tab-icon">🎯</div>
+                    <div class="tab-label">Challenges</div>
+                </div>
+                <div class="tab-item" onclick="switchTab(4)">
+                    <div class="tab-icon">👤</div>
+                    <div class="tab-label">Profile</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function switchTab(tabIndex) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.add('hidden'));
+            
+            // Show selected tab
+            tabs[tabIndex].classList.remove('hidden');
+            
+            // Update tab bar
+            const tabItems = document.querySelectorAll('.tab-item');
+            tabItems.forEach(item => item.classList.remove('active'));
+            tabItems[tabIndex].classList.add('active');
+        }
+        
+        function showNewChallenge() {
+            alert('Create New Challenge\n\nThis would open the challenge composer in the real app!');
+        }
+        
+        // Add some interactive animations
+        document.addEventListener('DOMContentLoaded', function() {
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach(bar => {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = width;
+                }, 500);
+            });
+        });
+    </script>
+</body>
+</html>

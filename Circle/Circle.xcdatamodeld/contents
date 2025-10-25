@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22758" systemVersion="23F79" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="AnalyticsEventEntity" representedClassName="AnalyticsEventEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="metadata" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSDictionary"/>
+        <attribute name="name" optional="NO" attributeType="String"/>
+        <attribute name="timestamp" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="Challenge" representedClassName="Challenge" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="descriptionText" optional="YES" attributeType="String"/>
+        <attribute name="endDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="frequency" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isActive" optional="NO" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="pointsPenalty" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pointsReward" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="startDate" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="targetUnit" optional="YES" attributeType="String"/>
+        <attribute name="targetValue" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="title" optional="NO" attributeType="String"/>
+        <attribute name="verificationMethod" optional="YES" attributeType="String"/>
+        <attribute name="verificationParams" optional="YES" attributeType="Binary"/>
+        <relationship name="circle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Circle" inverseName="challenges" inverseEntity="Circle"/>
+        <relationship name="createdBy" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="createdChallenges" inverseEntity="User"/>
+        <relationship name="proofs" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Proof" inverseName="challenge" inverseEntity="Proof"/>
+        <relationship name="template" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChallengeTemplate" inverseName="challenges" inverseEntity="ChallengeTemplate"/>
+    </entity>
+    <entity name="ChallengeTemplate" representedClassName="ChallengeTemplate" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="descriptionText" optional="YES" attributeType="String"/>
+        <attribute name="frequency" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isPreset" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="localizedTitle" optional="YES" attributeType="String"/>
+        <attribute name="targetUnit" optional="YES" attributeType="String"/>
+        <attribute name="targetValue" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="title" optional="NO" attributeType="String"/>
+        <attribute name="verificationMethod" optional="YES" attributeType="String"/>
+        <attribute name="verificationParams" optional="YES" attributeType="Binary"/>
+        <relationship name="challenges" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Challenge" inverseName="template" inverseEntity="Challenge"/>
+    </entity>
+    <entity name="Circle" representedClassName="Circle" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="inviteCode" optional="YES" attributeType="String"/>
+        <attribute name="isActive" optional="NO" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="name" optional="NO" attributeType="String"/>
+        <relationship name="challenges" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Challenge" inverseName="circle" inverseEntity="Circle"/>
+        <relationship name="leaderboardEntries" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="LeaderboardEntry" inverseName="circle" inverseEntity="Circle"/>
+        <relationship name="memberships" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Membership" inverseName="circle" inverseEntity="Circle"/>
+    </entity>
+    <entity name="ConsentLogEntity" representedClassName="ConsentLogEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="appVersion" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="currentStatus" optional="NO" attributeType="String"/>
+        <attribute name="deviceInfo" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="permissionType" optional="NO" attributeType="String"/>
+        <attribute name="previousStatus" optional="YES" attributeType="String"/>
+        <attribute name="reason" optional="YES" attributeType="String"/>
+        <attribute name="timestamp" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userAction" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="Device" representedClassName="Device" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lastSeenAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="model" optional="YES" attributeType="String"/>
+        <attribute name="osVersion" optional="YES" attributeType="String"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="devices" inverseEntity="User"/>
+    </entity>
+    <entity name="Forfeit" representedClassName="Forfeit" syncable="YES" codeGenerationType="class">
+        <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="descriptionText" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isCompleted" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="pointsAwarded" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+        <relationship name="assignedTo" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="forfeits" inverseEntity="User"/>
+        <relationship name="circle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Circle" inverseName="forfeits" inverseEntity="Circle"/>
+    </entity>
+    <entity name="HangoutParticipant" representedClassName="HangoutParticipant" syncable="YES" codeGenerationType="class">
+        <attribute name="durationSec" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="joinedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="leftAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="session" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="HangoutSession" inverseName="participants" inverseEntity="HangoutSession"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="hangoutParticipants" inverseEntity="User"/>
+    </entity>
+    <entity name="HangoutSession" representedClassName="HangoutSession" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="duration" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="endTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isActive" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="location" optional="YES" attributeType="Binary"/>
+        <attribute name="pointsAwarded" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="startTime" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="circle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Circle" inverseName="hangoutSessions" inverseEntity="Circle"/>
+        <relationship name="participants" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="HangoutParticipant" inverseName="session" inverseEntity="HangoutParticipant"/>
+    </entity>
+    <entity name="LeaderboardEntry" representedClassName="LeaderboardEntry" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="points" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="rank" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="weekEnding" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="weekStarting" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="circle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Circle" inverseName="leaderboardEntries" inverseEntity="Circle"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="leaderboardEntries" inverseEntity="User"/>
+    </entity>
+    <entity name="Membership" representedClassName="Membership" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="joinedAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="role" optional="NO" attributeType="String"/>
+        <relationship name="circle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Circle" inverseName="memberships" inverseEntity="Circle"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="memberships" inverseEntity="User"/>
+    </entity>
+    <entity name="PointsLedger" representedClassName="PointsLedger" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="points" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="reason" optional="YES" attributeType="String"/>
+        <attribute name="timestamp" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="challenge" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Challenge" inverseName="pointsLedger" inverseEntity="Challenge"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="pointsLedger" inverseEntity="User"/>
+    </entity>
+    <entity name="Proof" representedClassName="Proof" syncable="YES" codeGenerationType="class">
+        <attribute name="confidenceScore" optional="NO" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isVerified" optional="NO" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="pointsAwarded" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="sensorData" optional="YES" attributeType="Binary"/>
+        <attribute name="timestamp" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="verificationMethod" optional="YES" attributeType="String"/>
+        <relationship name="challenge" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Challenge" inverseName="proofs" inverseEntity="Challenge"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="proofs" inverseEntity="User"/>
+    </entity>
+    <entity name="SuspiciousActivityEntity" representedClassName="SuspiciousActivityEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="description" optional="YES" attributeType="String"/>
+        <attribute name="details" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSDictionary"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="severity" optional="NO" attributeType="String"/>
+        <attribute name="timestamp" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="type" optional="NO" attributeType="String"/>
+    </entity>
+    <entity name="User" representedClassName="User" syncable="YES" codeGenerationType="class">
+        <attribute name="appleUserID" optional="NO" attributeType="String"/>
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="displayName" optional="NO" attributeType="String"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lastActiveAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="profileEmoji" optional="YES" attributeType="String"/>
+        <attribute name="totalPoints" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="weeklyPoints" optional="NO" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="createdChallenges" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Challenge" inverseName="createdBy" inverseEntity="Challenge"/>
+        <relationship name="devices" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Device" inverseName="user" inverseEntity="Device"/>
+        <relationship name="forfeits" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Forfeit" inverseName="assignedTo" inverseEntity="Forfeit"/>
+        <relationship name="hangoutParticipants" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="HangoutParticipant" inverseName="user" inverseEntity="HangoutParticipant"/>
+        <relationship name="leaderboardEntries" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="LeaderboardEntry" inverseName="user" inverseEntity="LeaderboardEntry"/>
+        <relationship name="memberships" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Membership" inverseName="user" inverseEntity="Membership"/>
+        <relationship name="pointsLedger" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PointsLedger" inverseName="user" inverseEntity="PointsLedger"/>
+        <relationship name="proofs" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Proof" inverseName="user" inverseEntity="Proof"/>
+    </entity>
+    <entity name="WrappedStats" representedClassName="WrappedStats" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" optional="NO" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="statsData" optional="YES" attributeType="Binary"/>
+        <attribute name="year" optional="NO" attributeType="Integer 32" defaultValueString="2024" usesScalarValueType="YES"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="wrappedStats" inverseEntity="User"/>
+    </entity>
+</model>

@@ -1,0 +1,55 @@
+//
+//  Circle.entitlements
+//  Circle
+//
+//  Created by Circle Team on 2024-01-15.
+//
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- iCloud CloudKit -->
+    <key>com.apple.developer.icloud-container-identifiers</key>
+    <array>
+        <string>iCloud.com.circle.app</string>
+    </array>
+    
+    <key>com.apple.developer.icloud-services</key>
+    <array>
+        <string>CloudKit</string>
+    </array>
+    
+    <!-- Background Modes -->
+    <key>com.apple.developer.background-modes</key>
+    <array>
+        <string>background-app-refresh</string>
+        <string>background-processing</string>
+        <string>location</string>
+    </array>
+    
+    <!-- HealthKit -->
+    <key>com.apple.developer.healthkit</key>
+    <true/>
+    
+    <!-- Push Notifications -->
+    <key>aps-environment</key>
+    <string>development</string>
+    
+    <!-- Sign in with Apple -->
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+    
+    <!-- DeviceActivity (Screen Time API) - Optional -->
+    <key>com.apple.developer.family-controls</key>
+    <true/>
+    
+    <!-- Associated Domains for Deep Links -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:circle.app</string>
+    </array>
+</dict>
+</plist>

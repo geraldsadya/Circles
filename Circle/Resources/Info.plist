@@ -1,0 +1,270 @@
+//
+//  Info.plist
+//  Circle
+//
+//  Created by Circle Team on 2024-01-15.
+//
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Information -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Circle</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    
+    <!-- Scene Configuration -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Default Configuration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+    
+    <!-- Input Events -->
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    
+    <!-- Launch Screen -->
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>AccentColor</string>
+        <key>UIImageName</key>
+        <string>LaunchImage</string>
+        <key>UILaunchStoryboardName</key>
+        <string>LaunchScreen</string>
+    </dict>
+    
+    <!-- Device Capabilities -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+        <string>location-services</string>
+        <string>camera-flash</string>
+    </array>
+    
+    <!-- Supported Interface Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- Minimum iOS Version -->
+    <key>LSMinimumSystemVersion</key>
+    <string>16.4</string>
+    
+    <!-- Status Bar -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDefault</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+    
+    <!-- Privacy Usage Descriptions -->
+    
+    <!-- Location Permissions -->
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Circle needs your location to detect 5-minute hangouts with friends you've added and verify gym visits. Location data is processed on your device and never uploaded to servers.</string>
+    
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Circle uses your location to verify that you visited your saved gym location for at least 20 minutes. This helps ensure challenge authenticity.</string>
+    
+    <key>NSLocationTemporaryUsageDescriptionDictionary</key>
+    <dict>
+        <key>PreciseLocation</key>
+        <string>Verify a nearby hangout more accurately for the next 15 minutes. This helps ensure accurate proximity detection.</string>
+    </dict>
+    
+    <!-- Motion & Fitness -->
+    <key>NSMotionUsageDescription</key>
+    <string>Circle tracks your steps and workouts to verify runs and walks you choose to track. This data helps verify fitness challenges automatically.</string>
+    
+    <!-- Camera -->
+    <key>NSCameraUsageDescription</key>
+    <string>Circle uses your camera for live proof check-ins and forfeit challenges. All photos are processed on your device and immediately deleted - no images are stored or uploaded.</string>
+    
+    <!-- Bluetooth (Optional - foreground only) -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Circle uses Bluetooth to refine proximity detection when both friends have the app open. This helps ensure accurate hangout detection.</string>
+    
+    <!-- HealthKit -->
+    <key>NSHealthShareUsageDescription</key>
+    <string>Circle can verify sleep-before-11-pm goals you explicitly enable using your Health app data. This is optional and only used for sleep-based challenges.</string>
+    
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>Circle can update your Health app with verified fitness activities. This helps you track your progress across all health apps.</string>
+    
+    <!-- Screen Time API (Optional - requires entitlement) -->
+    <key>NSDeviceActivityUsageDescription</key>
+    <string>Circle verifies screen time challenges using your device usage data. This helps ensure you meet your digital wellness goals.</string>
+    
+    <!-- Background Modes -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>background-app-refresh</string>
+        <string>background-processing</string>
+        <string>location</string>
+    </array>
+    
+    <!-- HealthKit Integration -->
+    <key>NSHealthKitUsageDescription</key>
+    <string>Circle integrates with HealthKit to verify fitness and sleep challenges. This helps ensure accurate health goal tracking.</string>
+    
+    <!-- App Transport Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>circle.app</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
+    
+    <!-- Privacy - No Photo Library Access -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Circle does not access your photo library. All camera usage is live-only and temporary for verification purposes.</string>
+    
+    <!-- Microphone (for future voice proofs) -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Circle may use your microphone for voice-based proof challenges. This is optional and only used when you choose voice verification.</string>
+    
+    <!-- Contacts (for circle invitations) -->
+    <key>NSContactsUsageDescription</key>
+    <string>Circle can access your contacts to help you invite friends to circles. This is optional and you can manually enter email addresses instead.</string>
+    
+    <!-- Calendar (for challenge scheduling) -->
+    <key>NSCalendarsUsageDescription</key>
+    <string>Circle can access your calendar to help schedule challenges around your existing commitments. This is optional and you can manually set challenge times.</string>
+    
+    <!-- Face ID / Touch ID (for future biometric auth) -->
+    <key>NSFaceIDUsageDescription</key>
+    <string>Circle can use Face ID to securely authenticate your identity for sensitive operations. This is optional and you can use passcode instead.</string>
+    
+    <!-- App Store Information -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    
+    <!-- App Store Review Information -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 Circle Team. All rights reserved.</string>
+    
+    <!-- App Store Keywords -->
+    <key>ITSAppKeywords</key>
+    <string>accountability,challenges,friends,social,fitness,habits,goals,competition,leaderboard,verification,privacy,on-device</string>
+    
+    <!-- App Store Category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.social-networking</string>
+    
+    <!-- App Store Age Rating -->
+    <key>ITSAppAgeRating</key>
+    <string>12+</string>
+    
+    <!-- App Store Review Notes -->
+    <key>ITSAppReviewNotes</key>
+    <string>Circle is a social accountability app that helps friends stay committed to their goals through verified challenges. All verification happens on-device for privacy. Screen Time API features are optional and have fallback modes. BLE usage is foreground-only per App Store guidelines.</string>
+    
+    <!-- App Store Marketing URL -->
+    <key>ITSAppMarketingURL</key>
+    <string>https://circle.app</string>
+    
+    <!-- App Store Support URL -->
+    <key>ITSAppSupportURL</key>
+    <string>https://circle.app/support</string>
+    
+    <!-- App Store Privacy Policy URL -->
+    <key>ITSAppPrivacyPolicyURL</key>
+    <string>https://circle.app/privacy</string>
+    
+    <!-- App Store Terms of Service URL -->
+    <key>ITSAppTermsOfServiceURL</key>
+    <string>https://circle.app/terms</string>
+    
+    <!-- App Store Privacy Labels -->
+    <key>ITSAppPrivacyLabels</key>
+    <dict>
+        <key>DataTypes</key>
+        <array>
+            <dict>
+                <key>DataType</key>
+                <string>Location</string>
+                <key>DataUsage</key>
+                <string>Hangout detection and location-based challenges</string>
+                <key>DataSharing</key>
+                <string>Not shared with third parties</string>
+            </dict>
+            <dict>
+                <key>DataType</key>
+                <string>Motion & Fitness</string>
+                <key>DataUsage</key>
+                <string>Fitness challenge verification</string>
+                <key>DataSharing</key>
+                <string>Not shared with third parties</string>
+            </dict>
+            <dict>
+                <key>DataType</key>
+                <string>Camera</string>
+                <key>DataUsage</key>
+                <string>Live proof verification</string>
+                <key>DataSharing</key>
+                <string>Not shared with third parties</string>
+            </dict>
+            <dict>
+                <key>DataType</key>
+                <string>Health</string>
+                <key>DataUsage</key>
+                <string>Optional sleep tracking</string>
+                <key>DataSharing</key>
+                <string>Not shared with third parties</string>
+            </dict>
+        </array>
+    </dict>
+</dict>
+</plist>
