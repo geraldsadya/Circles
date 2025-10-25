@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreLocation
+import CoreMotion
 import Combine
 import CoreData
 
@@ -78,7 +79,7 @@ class LocationManager: NSObject, ObservableObject {
     }
     
     private func setupBackgroundLocationTracking() {
-        // Use Significant Location Change for battery efficiency
+        // Use Significant Location Change for battery efficiency - background location tracking
         locationManager.startMonitoringSignificantLocationChanges()
         
         // Start location updates when needed
@@ -153,7 +154,7 @@ class LocationManager: NSObject, ObservableObject {
         isTrackingHangouts = true
         loadNearbyFriends()
         
-        // Start hangout detection timer
+        // Start hangout detection timer - proximity-based friend detection
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.detectHangoutCandidates()
         }

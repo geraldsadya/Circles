@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreMotion
+import CoreLocation
 import Combine
 import CoreData
 
@@ -272,7 +273,7 @@ class MotionManager: ObservableObject {
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
         
-        // This would analyze motion activities for the day
+        // This would analyze motion activities for the day - activity classification
         // For now, return a basic summary
         return ActivitySummary(
             date: date,

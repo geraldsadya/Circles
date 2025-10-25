@@ -8,6 +8,8 @@
 import Foundation
 import BackgroundTasks
 import CoreData
+import CoreLocation
+import CoreMotion
 import Combine
 
 @MainActor

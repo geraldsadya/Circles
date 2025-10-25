@@ -3,6 +3,9 @@ import MapKit
 import CoreLocation
 import Combine
 
+// Import the actual LocationManager from Services
+// Note: In a real project, you'd import this properly or use @StateObject with dependency injection
+
 // MARK: - Models
 struct User: Identifiable, Hashable, Equatable {
     let id = UUID()
@@ -56,7 +59,52 @@ struct HangoutSession: Identifiable, Hashable, Equatable {
 
 // MARK: - Services
 // LocationManager is now implemented in Circle/Services/LocationManager.swift
-// This is just a placeholder for the HangoutEngine
+// This is a local wrapper for UI purposes
+
+class LocalLocationManager: NSObject, ObservableObject {
+    private let locationManager = CLLocationManager()
+    @Published var currentLocation: CLLocation?
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    
+    private var locationUpdateHandler: ((CLLocation) -> Void)?
+    
+    override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 10
+    }
+    
+    func requestLocationPermission() {
+        locationManager.requestWhenInUseAuthorization()
+    }
+    
+    func startLocationUpdates(handler: @escaping (CLLocation) -> Void) {
+        locationUpdateHandler = handler
+        locationManager.startUpdatingLocation()
+    }
+    
+    func stopLocationUpdates() {
+        locationManager.stopUpdatingLocation()
+        locationUpdateHandler = nil
+    }
+}
+
+extension LocalLocationManager: CLLocationManagerDelegate {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        DispatchQueue.main.async {
+            self.currentLocation = location
+        }
+        locationUpdateHandler?(location)
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        DispatchQueue.main.async {
+            self.authorizationStatus = status
+        }
+    }
+}
 
 class HangoutEngine: ObservableObject {
     static let shared = HangoutEngine()
@@ -1012,7 +1060,7 @@ struct ChallengeCard: View {
 
 // Placeholder views for other tabs
 struct CirclesView: View {
-    @StateObject private var locationManager = LocationManager.shared
+    @StateObject private var locationManager = LocalLocationManager()
     @StateObject private var hangoutEngine = HangoutEngine.shared
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
