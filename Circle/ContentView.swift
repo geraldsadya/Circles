@@ -55,52 +55,8 @@ struct HangoutSession: Identifiable, Hashable, Equatable {
 }
 
 // MARK: - Services
-class LocationManager: NSObject, ObservableObject {
-    static let shared = LocationManager()
-    
-    private let locationManager = CLLocationManager()
-    @Published var currentLocation: CLLocation?
-    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
-    
-    private var locationUpdateHandler: ((CLLocation) -> Void)?
-    
-    override init() {
-        super.init()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10
-    }
-    
-    func requestLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
-    }
-    
-    func startLocationUpdates(handler: @escaping (CLLocation) -> Void) {
-        locationUpdateHandler = handler
-        locationManager.startUpdatingLocation()
-    }
-    
-    func stopLocationUpdates() {
-        locationManager.stopUpdatingLocation()
-        locationUpdateHandler = nil
-    }
-}
-
-extension LocationManager: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        DispatchQueue.main.async {
-            self.currentLocation = location
-        }
-        locationUpdateHandler?(location)
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        DispatchQueue.main.async {
-            self.authorizationStatus = status
-        }
-    }
-}
+// LocationManager is now implemented in Circle/Services/LocationManager.swift
+// This is just a placeholder for the HangoutEngine
 
 class HangoutEngine: ObservableObject {
     static let shared = HangoutEngine()
@@ -815,7 +771,7 @@ struct NoLocationPermissionView: View {
 
 
 struct ContentView: View {
-    @State private var selectedTab = 2
+    @State private var selectedTab = 1 // Start with Circles tab (now index 1)
     @State private var dragOffset: CGFloat = 0
     
     var body: some View {
@@ -826,13 +782,10 @@ struct ContentView: View {
                     HomeView()
                         .frame(width: geometry.size.width)
                     
-                    LeaderboardView()
-                        .frame(width: geometry.size.width)
-                    
                     CirclesView()
                         .frame(width: geometry.size.width)
             
-            ChallengesView()
+                    ChallengesView()
                         .frame(width: geometry.size.width)
                     
                     ProfileView()
@@ -847,7 +800,7 @@ struct ContentView: View {
                         }
                         .onEnded { value in
                             let threshold: CGFloat = 50
-                            if value.translation.width < -threshold && selectedTab < 4 {
+                            if value.translation.width < -threshold && selectedTab < 3 {
                                 selectedTab += 1
                             } else if value.translation.width > threshold && selectedTab > 0 {
                                 selectedTab -= 1
@@ -865,27 +818,21 @@ struct ContentView: View {
                     }
                 }
                 
-                TabBarButton(icon: "trophy", selectedIcon: "trophy.fill", label: "Leaderboard", isSelected: selectedTab == 1) {
+                TabBarButton(icon: "circle.fill", selectedIcon: "circle.fill", label: "Circles", isSelected: selectedTab == 1) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         selectedTab = 1
                     }
                 }
                 
-                TabBarButton(icon: "circle.fill", selectedIcon: "circle.fill", label: "Circles", isSelected: selectedTab == 2) {
+                TabBarButton(icon: "target", selectedIcon: "target", label: "Challenges", isSelected: selectedTab == 2) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         selectedTab = 2
                     }
                 }
                 
-                TabBarButton(icon: "target", selectedIcon: "target", label: "Challenges", isSelected: selectedTab == 3) {
+                TabBarButton(icon: "person", selectedIcon: "person.fill", label: "Profile", isSelected: selectedTab == 3) {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         selectedTab = 3
-                    }
-                }
-                
-                TabBarButton(icon: "person", selectedIcon: "person.fill", label: "Profile", isSelected: selectedTab == 4) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedTab = 4
                     }
                 }
             }
@@ -1169,17 +1116,359 @@ struct LeaderboardView: View {
 }
 
 struct ChallengesView: View {
+    @State private var selectedChallenge: Challenge?
+    @State private var activeChallenges: [Challenge] = []
+    
     var body: some View {
         NavigationView {
-            VStack {
-                Text("Challenges")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                Text("Your challenges will appear here")
-                    .foregroundColor(.secondary)
+            VStack(spacing: 0) {
+                // Active Challenges List
+                if activeChallenges.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "target")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Active Challenges")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("Create your first challenge to start competing with friends!")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button("Create Challenge") {
+                            // Show challenge creation flow
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(activeChallenges) { challenge in
+                        ChallengeRow(challenge: challenge) {
+                            selectedChallenge = challenge
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+                
+                // Create New Challenge Button
+                if !activeChallenges.isEmpty {
+                    Button("Create New Challenge") {
+                        // Show challenge creation flow
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding()
+                }
             }
             .navigationTitle("Challenges")
+            .sheet(item: $selectedChallenge) { challenge in
+                ChallengeDetailView(challenge: challenge)
+            }
+            .onAppear {
+                loadActiveChallenges()
+            }
         }
+    }
+    
+    private func loadActiveChallenges() {
+        // Mock data for now - in real implementation, this would load from Core Data
+        activeChallenges = [
+            Challenge(
+                title: "Daily Steps Challenge",
+                description: "Walk 10,000 steps every day this week",
+                participants: ["You", "Sarah", "Mike", "Emma"],
+                points: 50,
+                verificationMethod: "motion",
+                isActive: true
+            ),
+            Challenge(
+                title: "Gym Hangout",
+                description: "Work out together at the gym",
+                participants: ["You", "Alex", "Josh"],
+                points: 30,
+                verificationMethod: "location",
+                isActive: true
+            ),
+            Challenge(
+                title: "Morning Run",
+                description: "Run 5K before 8 AM",
+                participants: ["You", "Sarah", "Mike"],
+                points: 40,
+                verificationMethod: "motion",
+                isActive: true
+            )
+        ]
+    }
+}
+
+struct Challenge: Identifiable {
+    let id = UUID()
+    let title: String
+    let description: String
+    let participants: [String]
+    let points: Int
+    let verificationMethod: String
+    let isActive: Bool
+}
+
+struct ChallengeRow: View {
+    let challenge: Challenge
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Challenge icon
+                Image(systemName: challengeIcon)
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                    .frame(width: 40, height: 40)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(challenge.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(challenge.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                    
+                    HStack {
+                        Text("\(challenge.participants.count) participants")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Text("\(challenge.points) pts")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                Spacer()
+                
+                // Progress indicator
+                VStack {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Tap for leaderboard")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var challengeIcon: String {
+        switch challenge.verificationMethod {
+        case "motion":
+            return "figure.walk"
+        case "location":
+            return "location"
+        case "camera":
+            return "camera"
+        default:
+            return "target"
+        }
+    }
+}
+
+struct ChallengeDetailView: View {
+    let challenge: Challenge
+    @Environment(\.dismiss) private var dismiss
+    @State private var leaderboardData: [LeaderboardEntry] = []
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Challenge info card
+                VStack(spacing: 16) {
+                    HStack {
+                        Image(systemName: challengeIcon)
+                            .font(.title)
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading) {
+                            Text(challenge.title)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Text(challenge.description)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Participants")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(challenge.participants.count)")
+                                .font(.headline)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing) {
+                            Text("Points")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(challenge.points)")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                .padding()
+                
+                // Leaderboard
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Leaderboard")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    if leaderboardData.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "trophy")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            
+                            Text("No data yet")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        List(leaderboardData) { entry in
+                            LeaderboardRow(entry: entry)
+                        }
+                        .listStyle(.plain)
+                    }
+                }
+                
+                Spacer()
+            }
+            .navigationTitle("Challenge Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            loadLeaderboardData()
+        }
+    }
+    
+    private var challengeIcon: String {
+        switch challenge.verificationMethod {
+        case "motion":
+            return "figure.walk"
+        case "location":
+            return "location"
+        case "camera":
+            return "camera"
+        default:
+            return "target"
+        }
+    }
+    
+    private func loadLeaderboardData() {
+        // Mock leaderboard data
+        leaderboardData = [
+            LeaderboardEntry(
+                participant: "Sarah",
+                score: 85,
+                rank: 1,
+                progress: 0.85,
+                isCurrentUser: false
+            ),
+            LeaderboardEntry(
+                participant: "You",
+                score: 72,
+                rank: 2,
+                progress: 0.72,
+                isCurrentUser: true
+            ),
+            LeaderboardEntry(
+                participant: "Mike",
+                score: 68,
+                rank: 3,
+                progress: 0.68,
+                isCurrentUser: false
+            ),
+            LeaderboardEntry(
+                participant: "Emma",
+                score: 45,
+                rank: 4,
+                progress: 0.45,
+                isCurrentUser: false
+            )
+        ]
+    }
+}
+
+struct LeaderboardEntry: Identifiable {
+    let id = UUID()
+    let participant: String
+    let score: Int
+    let rank: Int
+    let progress: Double
+    let isCurrentUser: Bool
+}
+
+struct LeaderboardRow: View {
+    let entry: LeaderboardEntry
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Rank
+            Text("\(entry.rank)")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(entry.rank <= 3 ? .orange : .secondary)
+                .frame(width: 30)
+            
+            // Participant name
+            Text(entry.participant)
+                .font(.body)
+                .fontWeight(entry.isCurrentUser ? .semibold : .regular)
+                .foregroundColor(entry.isCurrentUser ? .blue : .primary)
+            
+            Spacer()
+            
+            // Progress bar
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(entry.score)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                
+                ProgressView(value: entry.progress)
+                    .progressViewStyle(LinearProgressViewStyle(tint: entry.isCurrentUser ? .blue : .orange))
+                    .frame(width: 80)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

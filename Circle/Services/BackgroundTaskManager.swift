@@ -14,34 +14,29 @@ import Combine
 class BackgroundTaskManager: ObservableObject {
     static let shared = BackgroundTaskManager()
     
-    @Published var isProcessing = false
-    @Published var lastProcessedDate: Date?
-    @Published var processingStats: BackgroundProcessingStats?
-    @Published var errorMessage: String?
+    @Published var isBackgroundTaskRunning = false
+    @Published var lastBackgroundTaskTime: Date?
+    @Published var backgroundTaskStatus: BackgroundTaskStatus = .idle
     
     private let persistenceController = PersistenceController.shared
     private let challengeEngine = ChallengeEngine.shared
-    private let leaderboardManager = LeaderboardManager.shared
-    private let forfeitEngine = ForfeitEngine.shared
-    private let pointsEngine = PointsEngine.shared
-    private let hangoutEngine = HangoutEngine.shared
-    
-    // Background task identifiers
-    private let backgroundRefreshIdentifier = "com.circle.background-refresh"
-    private let backgroundProcessingIdentifier = "com.circle.background-processing"
-    private let weeklyRollupIdentifier = "com.circle.weekly-rollup"
-    private let dataCompactionIdentifier = "com.circle.data-compaction"
-    
-    // Processing state
-    private var isLowPowerMode = false
-    private var isCellularConnection = false
-    private var processingQueue: [BackgroundTask] = []
+    private let locationManager = LocationManager.shared
+    private let motionManager = MotionManager.shared
     private var cancellables = Set<AnyCancellable>()
     
-    private init() {
+    // Background task identifiers
+    private let challengeEvaluationTaskID = "com.circle.challenge-evaluation"
+    private let hangoutDetectionTaskID = "com.circle.hangout-detection"
+    private let dataSyncTaskID = "com.circle.data-sync"
+    private let weeklyRollupTaskID = "com.circle.weekly-rollup"
+    
+    // Task state
+    private var activeBackgroundTasks: Set<String> = []
+    private var taskCompletionHandlers: [String: (Bool) -> Void] = [:]
+    
+    init() {
         setupBackgroundTasks()
         setupNotifications()
-        registerBackgroundTasks()
     }
     
     deinit {
@@ -52,605 +47,479 @@ class BackgroundTaskManager: ObservableObject {
     private func setupBackgroundTasks() {
         // Register background task handlers
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: backgroundRefreshIdentifier,
+            forTaskWithIdentifier: challengeEvaluationTaskID,
             using: nil
         ) { [weak self] task in
-            Task { @MainActor in
-                await self?.handleBackgroundRefresh(task: task as! BGAppRefreshTask)
-            }
+            self?.handleChallengeEvaluationTask(task: task as! BGAppRefreshTask)
         }
         
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: backgroundProcessingIdentifier,
+            forTaskWithIdentifier: hangoutDetectionTaskID,
             using: nil
         ) { [weak self] task in
-            Task { @MainActor in
-                await self?.handleBackgroundProcessing(task: task as! BGProcessingTask)
-            }
+            self?.handleHangoutDetectionTask(task: task as! BGAppRefreshTask)
         }
         
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: weeklyRollupIdentifier,
+            forTaskWithIdentifier: dataSyncTaskID,
             using: nil
         ) { [weak self] task in
-            Task { @MainActor in
-                await self?.handleWeeklyRollup(task: task as! BGProcessingTask)
-            }
+            self?.handleDataSyncTask(task: task as! BGAppRefreshTask)
         }
         
         BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: dataCompactionIdentifier,
+            forTaskWithIdentifier: weeklyRollupTaskID,
             using: nil
         ) { [weak self] task in
-            Task { @MainActor in
-                await self?.handleDataCompaction(task: task as! BGProcessingTask)
-            }
+            self?.handleWeeklyRollupTask(task: task as! BGProcessingTask)
         }
     }
     
     private func setupNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleLowPowerModeChanged),
-            name: .NSProcessInfoPowerStateDidChange,
-            object: nil
-        )
+        // App lifecycle notifications
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.handleAppBecameActive()
+            }
+            .store(in: &cancellables)
         
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handlePointsAwarded),
-            name: .pointsAwarded,
-            object: nil
-        )
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in
+                self?.handleAppEnteredBackground()
+            }
+            .store(in: &cancellables)
         
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleHangoutEnded),
-            name: .hangoutEnded,
-            object: nil
-        )
+        // Low power mode notifications
+        NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)
+            .sink { [weak self] _ in
+                self?.handlePowerStateChange()
+            }
+            .store(in: &cancellables)
     }
     
-    private func registerBackgroundTasks() {
-        // Register background tasks in Info.plist
-        // This is done in the Info.plist file with BGTaskSchedulerPermittedIdentifiers
-        print("Background tasks registered")
+    // MARK: - Background Task Scheduling
+    func scheduleBackgroundTasks() {
+        scheduleChallengeEvaluationTask()
+        scheduleHangoutDetectionTask()
+        scheduleDataSyncTask()
+        scheduleWeeklyRollupTask()
     }
     
-    // MARK: - Background Refresh Handler
-    func handleBackgroundRefresh(task: BGAppRefreshTask) async {
-        print("Background refresh started")
-        
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        isProcessing = true
-        
-        do {
-            // Perform light background tasks
-            await performLightBackgroundTasks()
-            
-            // Schedule next background refresh
-            scheduleBackgroundRefresh()
-            
-            task.setTaskCompleted(success: true)
-            lastProcessedDate = Date()
-            
-            print("Background refresh completed successfully")
-            
-        } catch {
-            print("Background refresh failed: \(error)")
-            task.setTaskCompleted(success: false)
-            errorMessage = error.localizedDescription
-        }
-        
-        isProcessing = false
-    }
-    
-    // MARK: - Background Processing Handler
-    func handleBackgroundProcessing(task: BGProcessingTask) async {
-        print("Background processing started")
-        
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        isProcessing = true
-        
-        do {
-            // Perform heavy background tasks
-            await performHeavyBackgroundTasks()
-            
-            // Schedule next background processing
-            scheduleBackgroundProcessing()
-            
-            task.setTaskCompleted(success: true)
-            lastProcessedDate = Date()
-            
-            print("Background processing completed successfully")
-            
-        } catch {
-            print("Background processing failed: \(error)")
-            task.setTaskCompleted(success: false)
-            errorMessage = error.localizedDescription
-        }
-        
-        isProcessing = false
-    }
-    
-    // MARK: - Weekly Rollup Handler
-    func handleWeeklyRollup(task: BGProcessingTask) async {
-        print("Weekly rollup started")
-        
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        isProcessing = true
-        
-        do {
-            // Perform weekly rollup tasks
-            await performWeeklyRollup()
-            
-            // Schedule next weekly rollup
-            scheduleWeeklyRollup()
-            
-            task.setTaskCompleted(success: true)
-            lastProcessedDate = Date()
-            
-            print("Weekly rollup completed successfully")
-            
-        } catch {
-            print("Weekly rollup failed: \(error)")
-            task.setTaskCompleted(success: false)
-            errorMessage = error.localizedDescription
-        }
-        
-        isProcessing = false
-    }
-    
-    // MARK: - Data Compaction Handler
-    func handleDataCompaction(task: BGProcessingTask) async {
-        print("Data compaction started")
-        
-        task.expirationHandler = {
-            task.setTaskCompleted(success: false)
-        }
-        
-        isProcessing = true
-        
-        do {
-            // Perform data compaction
-            await performDataCompaction()
-            
-            // Schedule next data compaction
-            scheduleDataCompaction()
-            
-            task.setTaskCompleted(success: true)
-            lastProcessedDate = Date()
-            
-            print("Data compaction completed successfully")
-            
-        } catch {
-            print("Data compaction failed: \(error)")
-            task.setTaskCompleted(success: false)
-            errorMessage = error.localizedDescription
-        }
-        
-        isProcessing = false
-    }
-    
-    // MARK: - Light Background Tasks
-    private func performLightBackgroundTasks() async {
-        // Check for new challenges
-        await challengeEngine.evaluateAllActiveChallenges()
-        
-        // Update hangout detection
-        await hangoutEngine.mergeNearbyHangouts()
-        
-        // Clean up old data
-        await cleanupOldData()
-        
-        // Update processing stats
-        updateProcessingStats(taskType: .light)
-    }
-    
-    // MARK: - Heavy Background Tasks
-    private func performHeavyBackgroundTasks() async {
-        // Update leaderboards
-        await updateAllLeaderboards()
-        
-        // Process forfeits
-        await processForfeits()
-        
-        // Update points calculations
-        await updatePointsCalculations()
-        
-        // Update processing stats
-        updateProcessingStats(taskType: .heavy)
-    }
-    
-    // MARK: - Weekly Rollup Tasks
-    private func performWeeklyRollup() async {
-        // Create weekly leaderboard snapshots
-        await leaderboardManager.createWeeklySnapshot()
-        
-        // Reset weekly points
-        await pointsEngine.performWeeklyReset()
-        
-        // Assign weekly forfeits
-        await forfeitEngine.assignWeeklyForfeits()
-        
-        // Generate weekly analytics
-        await generateWeeklyAnalytics()
-        
-        // Update processing stats
-        updateProcessingStats(taskType: .weeklyRollup)
-    }
-    
-    // MARK: - Data Compaction Tasks
-    private func performDataCompaction() async {
-        // Compact old proofs
-        await compactOldProofs()
-        
-        // Compact old hangout sessions
-        await compactOldHangoutSessions()
-        
-        // Compact old points ledger
-        await compactOldPointsLedger()
-        
-        // Compact old leaderboard entries
-        await compactOldLeaderboardEntries()
-        
-        // Update processing stats
-        updateProcessingStats(taskType: .dataCompaction)
-    }
-    
-    // MARK: - Task Scheduling
-    func scheduleBackgroundRefresh() {
-        let request = BGAppRefreshTaskRequest(identifier: backgroundRefreshIdentifier)
+    private func scheduleChallengeEvaluationTask() {
+        let request = BGAppRefreshTaskRequest(identifier: challengeEvaluationTaskID)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
         
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("Background refresh scheduled")
+            print("✅ Scheduled challenge evaluation background task")
         } catch {
-            print("Failed to schedule background refresh: \(error)")
+            print("❌ Failed to schedule challenge evaluation task: \(error)")
         }
     }
     
-    func scheduleBackgroundProcessing() {
-        let request = BGProcessingTaskRequest(identifier: backgroundProcessingIdentifier)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60) // 1 hour
-        request.requiresNetworkConnectivity = false
-        request.requiresExternalPower = false
+    private func scheduleHangoutDetectionTask() {
+        let request = BGAppRefreshTaskRequest(identifier: hangoutDetectionTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 5 * 60) // 5 minutes
         
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("Background processing scheduled")
+            print("✅ Scheduled hangout detection background task")
         } catch {
-            print("Failed to schedule background processing: \(error)")
+            print("❌ Failed to schedule hangout detection task: \(error)")
         }
     }
     
-    func scheduleWeeklyRollup() {
-        let calendar = Calendar.current
-        let now = Date()
+    private func scheduleDataSyncTask() {
+        let request = BGAppRefreshTaskRequest(identifier: dataSyncTaskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60) // 30 minutes
         
-        // Find next Sunday at 11:55 PM
-        var nextSunday = calendar.nextDate(
-            after: now,
-            matching: DateComponents(weekday: 1), // Sunday
-            matchingPolicy: .nextTime
-        ) ?? now
-        
-        nextSunday = calendar.date(bySettingHour: 23, minute: 55, second: 0, of: nextSunday) ?? nextSunday
-        
-        let request = BGProcessingTaskRequest(identifier: weeklyRollupIdentifier)
-        request.earliestBeginDate = nextSunday
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("✅ Scheduled data sync background task")
+        } catch {
+            print("❌ Failed to schedule data sync task: \(error)")
+        }
+    }
+    
+    private func scheduleWeeklyRollupTask() {
+        let request = BGProcessingTaskRequest(identifier: weeklyRollupTaskID)
         request.requiresNetworkConnectivity = true
         request.requiresExternalPower = false
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 24 * 60 * 60) // 24 hours
         
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("Weekly rollup scheduled for: \(nextSunday)")
+            print("✅ Scheduled weekly rollup background task")
         } catch {
-            print("Failed to schedule weekly rollup: \(error)")
+            print("❌ Failed to schedule weekly rollup task: \(error)")
         }
     }
     
-    func scheduleDataCompaction() {
-        let request = BGProcessingTaskRequest(identifier: dataCompactionIdentifier)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 7 * 24 * 60 * 60) // 1 week
-        request.requiresNetworkConnectivity = false
-        request.requiresExternalPower = true
+    // MARK: - Background Task Handlers
+    private func handleChallengeEvaluationTask(task: BGAppRefreshTask) {
+        print("🔄 Starting challenge evaluation background task")
         
-        do {
-            try BGTaskScheduler.shared.submit(request)
-            print("Data compaction scheduled")
-        } catch {
-            print("Failed to schedule data compaction: \(error)")
+        isBackgroundTaskRunning = true
+        backgroundTaskStatus = .challengeEvaluation
+        activeBackgroundTasks.insert(challengeEvaluationTaskID)
+        
+        task.expirationHandler = {
+            print("⏰ Challenge evaluation task expired")
+            task.setTaskCompleted(success: false)
+            self.isBackgroundTaskRunning = false
+            self.backgroundTaskStatus = .idle
+            self.activeBackgroundTasks.remove(challengeEvaluationTaskID)
         }
-    }
-    
-    // MARK: - Helper Methods
-    private func updateAllLeaderboards() async {
-        let request: NSFetchRequest<Circle> = Circle.fetchRequest()
         
-        do {
-            let circles = try persistenceController.container.viewContext.fetch(request)
-            
-            for circle in circles {
-                await leaderboardManager.updateLeaderboard(for: circle)
+        Task {
+            do {
+                // Evaluate all active challenges
+                await challengeEngine.evaluateAllActiveChallenges()
+                
+                // Update motion-based challenges
+                await updateMotionChallenges()
+                
+                // Save context
+                persistenceController.save()
+                
+                print("✅ Challenge evaluation completed successfully")
+                task.setTaskCompleted(success: true)
+                
+            } catch {
+                print("❌ Challenge evaluation failed: \(error)")
+                task.setTaskCompleted(success: false)
             }
             
-        } catch {
-            print("Error updating leaderboards: \(error)")
+            // Clean up
+            isBackgroundTaskRunning = false
+            backgroundTaskStatus = .idle
+            activeBackgroundTasks.remove(challengeEvaluationTaskID)
+            lastBackgroundTaskTime = Date()
+            
+            // Schedule next task
+            scheduleChallengeEvaluationTask()
         }
     }
     
-    private func processForfeits() async {
-        // Process active forfeits
-        await forfeitEngine.processActiveForfeits()
-    }
-    
-    private func updatePointsCalculations() async {
-        // Update points calculations for all users
-        let request: NSFetchRequest<User> = User.fetchRequest()
+    private func handleHangoutDetectionTask(task: BGAppRefreshTask) {
+        print("🔄 Starting hangout detection background task")
         
-        do {
-            let users = try persistenceController.container.viewContext.fetch(request)
-            
-            for user in users {
-                await pointsEngine.calculateDailyPoints(for: user)
+        isBackgroundTaskRunning = true
+        backgroundTaskStatus = .hangoutDetection
+        activeBackgroundTasks.insert(hangoutDetectionTaskID)
+        
+        task.expirationHandler = {
+            print("⏰ Hangout detection task expired")
+            task.setTaskCompleted(success: false)
+            self.isBackgroundTaskRunning = false
+            self.backgroundTaskStatus = .idle
+            self.activeBackgroundTasks.remove(hangoutDetectionTaskID)
+        }
+        
+        Task {
+            do {
+                // Update location and detect hangouts
+                await locationManager.detectHangoutCandidates()
+                
+                // Process any pending hangout sessions
+                await processPendingHangoutSessions()
+                
+                print("✅ Hangout detection completed successfully")
+                task.setTaskCompleted(success: true)
+                
+            } catch {
+                print("❌ Hangout detection failed: \(error)")
+                task.setTaskCompleted(success: false)
             }
             
-        } catch {
-            print("Error updating points calculations: \(error)")
+            // Clean up
+            isBackgroundTaskRunning = false
+            backgroundTaskStatus = .idle
+            activeBackgroundTasks.remove(hangoutDetectionTaskID)
+            lastBackgroundTaskTime = Date()
+            
+            // Schedule next task
+            scheduleHangoutDetectionTask()
         }
     }
     
-    private func generateWeeklyAnalytics() async {
-        // Generate weekly analytics for all circles
-        let request: NSFetchRequest<Circle> = Circle.fetchRequest()
+    private func handleDataSyncTask(task: BGAppRefreshTask) {
+        print("🔄 Starting data sync background task")
         
-        do {
-            let circles = try persistenceController.container.viewContext.fetch(request)
-            
-            for circle in circles {
-                await generateCircleAnalytics(circle)
+        isBackgroundTaskRunning = true
+        backgroundTaskStatus = .dataSync
+        activeBackgroundTasks.insert(dataSyncTaskID)
+        
+        task.expirationHandler = {
+            print("⏰ Data sync task expired")
+            task.setTaskCompleted(success: false)
+            self.isBackgroundTaskRunning = false
+            self.backgroundTaskStatus = .idle
+            self.activeBackgroundTasks.remove(dataSyncTaskID)
+        }
+        
+        Task {
+            do {
+                // Sync with CloudKit
+                await persistenceController.syncWithCloudKit()
+                
+                // Update motion data
+                await motionManager.updateTodaysSteps()
+                
+                // Clean up old data
+                await cleanupOldData()
+                
+                print("✅ Data sync completed successfully")
+                task.setTaskCompleted(success: true)
+                
+            } catch {
+                print("❌ Data sync failed: \(error)")
+                task.setTaskCompleted(success: false)
             }
             
-        } catch {
-            print("Error generating weekly analytics: \(error)")
+            // Clean up
+            isBackgroundTaskRunning = false
+            backgroundTaskStatus = .idle
+            activeBackgroundTasks.remove(dataSyncTaskID)
+            lastBackgroundTaskTime = Date()
+            
+            // Schedule next task
+            scheduleDataSyncTask()
         }
     }
     
-    private func generateCircleAnalytics(_ circle: Circle) async {
-        // Generate analytics for a specific circle
-        let stats = leaderboardManager.getLeaderboardStats(for: circle)
+    private func handleWeeklyRollupTask(task: BGProcessingTask) {
+        print("🔄 Starting weekly rollup background task")
         
-        // Store analytics in Core Data
-        let analytics = CircleAnalytics(context: persistenceController.container.viewContext)
-        analytics.id = UUID()
-        analytics.circle = circle
-        analytics.weekStart = stats.weekStart
-        analytics.totalParticipants = Int32(stats.totalParticipants)
-        analytics.totalPoints = stats.totalPoints
-        analytics.averagePoints = stats.averagePoints
-        analytics.createdAt = Date()
+        isBackgroundTaskRunning = true
+        backgroundTaskStatus = .weeklyRollup
+        activeBackgroundTasks.insert(weeklyRollupTaskID)
         
-        try? persistenceController.container.viewContext.save()
-    }
-    
-    private func compactOldProofs() async {
-        let cutoffDate = Date().addingTimeInterval(-90 * 24 * 60 * 60) // 90 days ago
+        task.expirationHandler = {
+            print("⏰ Weekly rollup task expired")
+            task.setTaskCompleted(success: false)
+            self.isBackgroundTaskRunning = false
+            self.backgroundTaskStatus = .idle
+            self.activeBackgroundTasks.remove(weeklyRollupTaskID)
+        }
         
-        let request: NSFetchRequest<Proof> = Proof.fetchRequest()
-        request.predicate = NSPredicate(format: "timestamp < %@", cutoffDate as NSDate)
-        
-        do {
-            let oldProofs = try persistenceController.container.viewContext.fetch(request)
-            
-            for proof in oldProofs {
-                persistenceController.container.viewContext.delete(proof)
+        Task {
+            do {
+                // Generate weekly leaderboards
+                await generateWeeklyLeaderboards()
+                
+                // Create weekly summaries
+                await createWeeklySummaries()
+                
+                // Archive old data
+                await archiveOldData()
+                
+                print("✅ Weekly rollup completed successfully")
+                task.setTaskCompleted(success: true)
+                
+            } catch {
+                print("❌ Weekly rollup failed: \(error)")
+                task.setTaskCompleted(success: false)
             }
             
-            try persistenceController.container.viewContext.save()
-            print("Compacted \(oldProofs.count) old proofs")
+            // Clean up
+            isBackgroundTaskRunning = false
+            backgroundTaskStatus = .idle
+            activeBackgroundTasks.remove(weeklyRollupTaskID)
+            lastBackgroundTaskTime = Date()
             
-        } catch {
-            print("Error compacting old proofs: \(error)")
+            // Schedule next task
+            scheduleWeeklyRollupTask()
         }
     }
     
-    private func compactOldHangoutSessions() async {
-        let cutoffDate = Date().addingTimeInterval(-30 * 24 * 60 * 60) // 30 days ago
+    // MARK: - Task Implementation
+    private func updateMotionChallenges() async {
+        // Update motion-based challenges with latest data
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<Challenge> = Challenge.fetchRequest()
+        request.predicate = NSPredicate(format: "verificationMethod == %@", "motion")
         
+        do {
+            let motionChallenges = try context.fetch(request)
+            for challenge in motionChallenges {
+                // Update challenge with latest motion data
+                // This would integrate with the motion verification system
+            }
+        } catch {
+            print("Error updating motion challenges: \(error)")
+        }
+    }
+    
+    private func processPendingHangoutSessions() async {
+        // Process any hangout sessions that need to be ended or updated
+        let context = persistenceController.container.viewContext
         let request: NSFetchRequest<HangoutSession> = HangoutSession.fetchRequest()
-        request.predicate = NSPredicate(format: "startTime < %@", cutoffDate as NSDate)
+        request.predicate = NSPredicate(format: "isActive == YES")
         
         do {
-            let oldSessions = try persistenceController.container.viewContext.fetch(request)
-            
-            for session in oldSessions {
-                persistenceController.container.viewContext.delete(session)
+            let activeSessions = try context.fetch(request)
+            for session in activeSessions {
+                // Check if session should be ended
+                let timeSinceStart = Date().timeIntervalSince(session.startTime)
+                if timeSinceStart > 3600 { // 1 hour max
+                    await locationManager.endHangoutSession(session)
+                }
             }
-            
-            try persistenceController.container.viewContext.save()
-            print("Compacted \(oldSessions.count) old hangout sessions")
-            
         } catch {
-            print("Error compacting old hangout sessions: \(error)")
-        }
-    }
-    
-    private func compactOldPointsLedger() async {
-        let cutoffDate = Date().addingTimeInterval(-365 * 24 * 60 * 60) // 1 year ago
-        
-        let request: NSFetchRequest<PointsLedger> = PointsLedger.fetchRequest()
-        request.predicate = NSPredicate(format: "timestamp < %@", cutoffDate as NSDate)
-        
-        do {
-            let oldEntries = try persistenceController.container.viewContext.fetch(request)
-            
-            for entry in oldEntries {
-                persistenceController.container.viewContext.delete(entry)
-            }
-            
-            try persistenceController.container.viewContext.save()
-            print("Compacted \(oldEntries.count) old points ledger entries")
-            
-        } catch {
-            print("Error compacting old points ledger: \(error)")
-        }
-    }
-    
-    private func compactOldLeaderboardEntries() async {
-        let cutoffDate = Date().addingTimeInterval(-52 * 7 * 24 * 60 * 60) // 52 weeks ago
-        
-        let request: NSFetchRequest<LeaderboardEntry> = LeaderboardEntry.fetchRequest()
-        request.predicate = NSPredicate(format: "weekStart < %@", cutoffDate as NSDate)
-        
-        do {
-            let oldEntries = try persistenceController.container.viewContext.fetch(request)
-            
-            for entry in oldEntries {
-                persistenceController.container.viewContext.delete(entry)
-            }
-            
-            try persistenceController.container.viewContext.save()
-            print("Compacted \(oldEntries.count) old leaderboard entries")
-            
-        } catch {
-            print("Error compacting old leaderboard entries: \(error)")
+            print("Error processing hangout sessions: \(error)")
         }
     }
     
     private func cleanupOldData() async {
-        // Clean up old data
-        await hangoutEngine.cleanupOldHangouts()
-        await antiCheatEngine.cleanupOldActivities()
-        await proofHooksManager.cleanupOldProofs()
-    }
-    
-    private func updateProcessingStats(taskType: BackgroundTaskType) {
-        let stats = BackgroundProcessingStats(
-            taskType: taskType,
-            processedAt: Date(),
-            isLowPowerMode: isLowPowerMode,
-            isCellularConnection: isCellularConnection,
-            processingDuration: 0.0 // This would be calculated
-        )
+        // Clean up old analytics events, logs, etc.
+        let context = persistenceController.container.viewContext
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         
-        processingStats = stats
-    }
-    
-    // MARK: - Notification Handlers
-    @objc private func handleLowPowerModeChanged(_ notification: Notification) {
-        isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
-        
-        if isLowPowerMode {
-            // Reduce background task frequency
-            print("Low power mode enabled - reducing background task frequency")
-        } else {
-            // Restore normal background task frequency
-            print("Low power mode disabled - restoring normal background task frequency")
-        }
-    }
-    
-    @objc private func handlePointsAwarded(_ notification: Notification) {
-        // Schedule background processing if significant points were awarded
-        guard let userInfo = notification.userInfo,
-              let points = userInfo["points"] as? Int32,
-              abs(points) > 10 else { return }
-        
-        scheduleBackgroundProcessing()
-    }
-    
-    @objc private func handleHangoutEnded(_ notification: Notification) {
-        // Schedule background processing for hangout updates
-        scheduleBackgroundProcessing()
-    }
-    
-    // MARK: - Manual Processing
-    func processNow() async {
-        guard !isProcessing else { return }
-        
-        isProcessing = true
+        // Clean up old analytics events
+        let analyticsRequest: NSFetchRequest<AnalyticsEventEntity> = AnalyticsEventEntity.fetchRequest()
+        analyticsRequest.predicate = NSPredicate(format: "timestamp < %@", thirtyDaysAgo as NSDate)
         
         do {
-            await performLightBackgroundTasks()
-            await performHeavyBackgroundTasks()
-            
-            lastProcessedDate = Date()
-            
+            let oldEvents = try context.fetch(analyticsRequest)
+            for event in oldEvents {
+                context.delete(event)
+            }
+            try context.save()
+            print("Cleaned up \(oldEvents.count) old analytics events")
         } catch {
-            errorMessage = error.localizedDescription
+            print("Error cleaning up old data: \(error)")
         }
+    }
+    
+    private func generateWeeklyLeaderboards() async {
+        // Generate weekly leaderboards for all circles
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<Circle> = Circle.fetchRequest()
         
-        isProcessing = false
-    }
-    
-    // MARK: - Analytics
-    func getBackgroundProcessingStats() -> BackgroundProcessingStats? {
-        return processingStats
-    }
-    
-    func getProcessingHistory() -> [BackgroundProcessingStats] {
-        // This would return historical processing stats
-        // For now, return current stats if available
-        if let stats = processingStats {
-            return [stats]
+        do {
+            let circles = try context.fetch(request)
+            for circle in circles {
+                // Generate leaderboard for this circle
+                // This would integrate with the LeaderboardManager
+            }
+        } catch {
+            print("Error generating weekly leaderboards: \(error)")
         }
-        return []
+    }
+    
+    private func createWeeklySummaries() async {
+        // Create weekly summaries for all users
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<User> = User.fetchRequest()
+        
+        do {
+            let users = try context.fetch(request)
+            for user in users {
+                // Create weekly summary for this user
+                // This would integrate with the WrappedExportManager
+            }
+        } catch {
+            print("Error creating weekly summaries: \(error)")
+        }
+    }
+    
+    private func archiveOldData() async {
+        // Archive data older than 3 months
+        let threeMonthsAgo = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
+        
+        // Archive old hangout sessions
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<HangoutSession> = HangoutSession.fetchRequest()
+        request.predicate = NSPredicate(format: "startTime < %@", threeMonthsAgo as NSDate)
+        
+        do {
+            let oldSessions = try context.fetch(request)
+            for session in oldSessions {
+                // Archive the session (move to archive table or mark as archived)
+                session.isActive = false
+            }
+            try context.save()
+            print("Archived \(oldSessions.count) old hangout sessions")
+        } catch {
+            print("Error archiving old data: \(error)")
+        }
+    }
+    
+    // MARK: - Power Management
+    private func handlePowerStateChange() {
+        let isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        
+        if isLowPowerMode {
+            print("🔋 Low power mode enabled - reducing background task frequency")
+            // Reduce background task frequency
+            // Skip non-essential tasks
+        } else {
+            print("🔋 Low power mode disabled - resuming normal background tasks")
+            // Resume normal background task frequency
+        }
+    }
+    
+    // MARK: - App Lifecycle Handlers
+    private func handleAppBecomeActive() {
+        // Cancel any pending background tasks
+        BGTaskScheduler.shared.cancelAllTaskRequests()
+        
+        // Reschedule tasks for normal operation
+        scheduleBackgroundTasks()
+    }
+    
+    private func handleAppEnteredBackground() {
+        // Ensure background tasks are scheduled
+        scheduleBackgroundTasks()
+    }
+    
+    // MARK: - Public Methods
+    func getBackgroundTaskStatus() -> String {
+        switch backgroundTaskStatus {
+        case .idle:
+            return "Idle"
+        case .challengeEvaluation:
+            return "Evaluating Challenges"
+        case .hangoutDetection:
+            return "Detecting Hangouts"
+        case .dataSync:
+            return "Syncing Data"
+        case .weeklyRollup:
+            return "Weekly Rollup"
+        }
+    }
+    
+    func getActiveTaskCount() -> Int {
+        return activeBackgroundTasks.count
+    }
+    
+    func isTaskActive(_ taskID: String) -> Bool {
+        return activeBackgroundTasks.contains(taskID)
     }
 }
 
 // MARK: - Supporting Types
-enum BackgroundTaskType: String, CaseIterable {
-    case light = "light"
-    case heavy = "heavy"
-    case weeklyRollup = "weekly_rollup"
-    case dataCompaction = "data_compaction"
-    
-    var displayName: String {
-        switch self {
-        case .light: return "Light Processing"
-        case .heavy: return "Heavy Processing"
-        case .weeklyRollup: return "Weekly Rollup"
-        case .dataCompaction: return "Data Compaction"
-        }
+enum BackgroundTaskStatus {
+    case idle
+    case challengeEvaluation
+    case hangoutDetection
+    case dataSync
+    case weeklyRollup
+}
+
+// MARK: - Extensions
+extension PersistenceController {
+    func syncWithCloudKit() async {
+        // This would handle CloudKit synchronization
+        // For now, just save the context
+        save()
     }
 }
 
-struct BackgroundTask {
-    let id: UUID
-    let type: BackgroundTaskType
-    let priority: Int
-    let createdAt: Date
-    let data: [String: Any]
-}
-
-struct BackgroundProcessingStats {
-    let taskType: BackgroundTaskType
-    let processedAt: Date
-    let isLowPowerMode: Bool
-    let isCellularConnection: Bool
-    let processingDuration: TimeInterval
-}
-
-// MARK: - Core Data Extensions
-extension CircleAnalytics {
-    static func fetchRequest() -> NSFetchRequest<CircleAnalytics> {
-        return NSFetchRequest<CircleAnalytics>(entityName: "CircleAnalytics")
+extension MotionManager {
+    func updateTodaysSteps() async {
+        // This would update today's step count
+        // The actual implementation is in MotionManager
     }
-}
-
-// MARK: - Notifications
-extension Notification.Name {
-    static let backgroundProcessingCompleted = Notification.Name("backgroundProcessingCompleted")
-    static let weeklyRollupCompleted = Notification.Name("weeklyRollupCompleted")
-    static let dataCompactionCompleted = Notification.Name("dataCompactionCompleted")
 }

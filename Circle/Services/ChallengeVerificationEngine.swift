@@ -364,28 +364,10 @@ class ChallengeVerificationEngine: ObservableObject {
     }
 }
 
-// MARK: - Manager Classes (Placeholders)
-class LocationManager {
-    static let shared = LocationManager()
-    var currentLocation: CLLocation?
-    var isStationary: Bool = false
-    
-    func durationAtLocation(_ location: CLLocation) -> Double {
-        // Implementation will be added
-        return 0.0
-    }
-}
-
-class MotionManager {
-    static let shared = MotionManager()
-    var isActivelyMoving: Bool = false
-    var motionDuration: Double = 0.0
-    
-    func getStepsForDate(_ date: Date) -> (stepCount: Int, distance: Double) {
-        // Implementation will be added
-        return (0, 0.0)
-    }
-}
+// MARK: - Manager Classes (Now using actual implementations)
+// LocationManager and MotionManager are now implemented in separate files
+// HealthManager, CameraManager, and DeviceActivityManager remain as placeholders
+// until Phase 2 implementation
 
 class HealthManager {
     static let shared = HealthManager()
@@ -395,7 +377,7 @@ class CameraManager {
     static let shared = CameraManager()
     
     func captureLivenessFrames(count: Int) -> [UIImage] {
-        // Implementation will be added
+        // Implementation will be added in Phase 2
         return []
     }
 }
@@ -409,7 +391,7 @@ class DeviceActivityManager {
     static let shared = DeviceActivityManager()
     
     func getDailyUsage() -> (totalHours: Double) {
-        // Implementation will be added
+        // Implementation will be added in Phase 2
         return (0.0)
     }
 }
