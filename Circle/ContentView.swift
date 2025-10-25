@@ -835,9 +835,6 @@ struct ContentView: View {
             
                     ChallengesView()
                         .frame(width: geometry.size.width)
-                    
-                    ProfileView()
-                        .frame(width: geometry.size.width)
                 }
                 .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
                 .animation(.interactiveSpring(), value: selectedTab)
@@ -848,7 +845,7 @@ struct ContentView: View {
                         }
                         .onEnded { value in
                             let threshold: CGFloat = 50
-                            if value.translation.width < -threshold && selectedTab < 3 {
+                            if value.translation.width < -threshold && selectedTab < 2 {
                                 selectedTab += 1
                             } else if value.translation.width > threshold && selectedTab > 0 {
                                 selectedTab -= 1
@@ -858,7 +855,7 @@ struct ContentView: View {
                 )
             }
             
-            // Custom Tab Bar
+            // Custom Tab Bar - Native iPhone app feel
             HStack(spacing: 0) {
                 TabBarButton(icon: "house", selectedIcon: "house.fill", label: "Home", isSelected: selectedTab == 0) {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -877,12 +874,6 @@ struct ContentView: View {
                         selectedTab = 2
                     }
                 }
-                
-                TabBarButton(icon: "person", selectedIcon: "person.fill", label: "Profile", isSelected: selectedTab == 3) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedTab = 3
-                    }
-                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 12)
@@ -895,11 +886,15 @@ struct ContentView: View {
 }
 
 struct HomeView: View {
+    @StateObject private var healthKitManager = HealthKitManager.shared
+    @StateObject private var motionManager = MotionManager.shared
+    @State private var healthInsights: [HealthInsight] = []
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Welcome Header
+                    // Welcome Header - Native iPhone style
                     VStack(spacing: 16) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -908,65 +903,112 @@ struct HomeView: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(.primary)
                                 
-                                Text("Alex")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.primary)
+                                Text("Ready to connect?")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
                             }
                             
                             Spacer()
                             
-                            // Profile Avatar - Minimalist
+                            // Minimalist profile indicator (like native apps)
                             Circle()
-                                .fill(Color(.systemGray5))
-                                .frame(width: 50, height: 50)
+                                .fill(Color.blue.gradient)
+                                .frame(width: 40, height: 40)
                                 .overlay(
-                                    Circle()
-                                        .stroke(Color(.systemGray4), lineWidth: 1)
+                                    Text("👤")
+                                        .font(.title3)
                                 )
                         }
                         
-                        Text("Ready to prove it today?")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        // Health Stats - Native style
+                        HStack(spacing: 16) {
+                            HealthStatCard(
+                                title: "Steps",
+                                value: "\(healthKitManager.todaysSteps)",
+                                icon: "figure.walk",
+                                color: .green
+                            )
+                            
+                            HealthStatCard(
+                                title: "Sleep",
+                                value: String(format: "%.1fh", healthKitManager.todaysSleepHours),
+                                icon: "bed.double",
+                                color: .purple
+                            )
+                            
+                            HealthStatCard(
+                                title: "Hangouts",
+                                value: "2",
+                                icon: "person.2.fill",
+                                color: .blue
+                            )
+                        }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
                     
-                    // Quick Stats
-                    HStack(spacing: 16) {
-                        StatCard(title: "Points", value: "150", icon: "star.fill")
-                        StatCard(title: "Challenges", value: "3", icon: "target")
-                        StatCard(title: "Hangouts", value: "2", icon: "person.3.fill")
+                    // Health Insights
+                    if !healthInsights.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Health Insights")
+                                .font(.headline)
+                                .padding(.horizontal, 20)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(healthInsights) { insight in
+                                        HealthInsightCard(insight: insight)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                            }
+                        }
                     }
                     
                     // Active Challenges
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Active Challenges")
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                        HStack {
+                            Text("Active Challenges")
+                                .font(.headline)
+                            
+                            Spacer()
+                            
+                            Button("View All") {
+                                // Navigate to challenges
+                            }
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                        }
+                        .padding(.horizontal, 20)
                         
-                        ChallengeCard(title: "Gym 4x this week", progress: 0.8)
-                        ChallengeCard(title: "Walk 10k steps daily", progress: 0.7)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(mockChallenges) { challenge in
+                                    ChallengeCard(challenge: challenge)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
+                .padding(.vertical, 20)
             }
             .navigationTitle("Circle")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {}) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                            .foregroundColor(.primary)
-                    }
-                }
+            .onAppear {
+                loadHealthInsights()
             }
         }
+    }
+    
+    private func loadHealthInsights() {
+        healthInsights = healthKitManager.getHealthInsights()
+    }
+    
+    private var mockChallenges: [Challenge] {
+        [
+            Challenge(title: "Daily Steps", description: "Walk 10,000 steps", participants: ["You", "Sarah"], points: 50, verificationMethod: "motion", isActive: true),
+            Challenge(title: "Gym Session", description: "Work out together", participants: ["You", "Mike"], points: 30, verificationMethod: "location", isActive: true)
+        ]
     }
 }
 
@@ -1000,6 +1042,71 @@ struct StatCard: View {
                         .stroke(Color(.systemGray5), lineWidth: 1)
                 )
         )
+    }
+}
+
+struct HealthStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.title3)
+                .fontWeight(.bold)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+struct HealthInsightCard: View {
+    let insight: HealthInsight
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: insight.icon)
+                    .foregroundColor(insightColor)
+                
+                Text(insight.title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+            }
+            
+            Text(insight.description)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+        }
+        .padding(12)
+        .frame(width: 200)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
+    private var insightColor: Color {
+        switch insight.type {
+        case .achievement: return .green
+        case .motivation: return .blue
+        case .warning: return .orange
+        case .tip: return .purple
+        }
     }
 }
 
@@ -1517,21 +1624,6 @@ struct LeaderboardRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-}
-
-struct ProfileView: View {
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Profile")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                Text("Your profile will appear here")
-                    .foregroundColor(.secondary)
-            }
-            .navigationTitle("Profile")
-        }
     }
 }
 
