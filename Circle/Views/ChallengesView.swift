@@ -34,7 +34,7 @@ struct ChallengesView: View {
                     challengesList
                 }
             }
-            .navigationTitle("Challenges")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

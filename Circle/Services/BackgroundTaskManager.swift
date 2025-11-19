@@ -177,15 +177,15 @@ class BackgroundTaskManager: ObservableObject {
             do {
                 // Evaluate all active challenges
                 await challengeEngine.evaluateAllActiveChallenges()
-                
+        
                 // Update motion-based challenges
                 await updateMotionChallenges()
-                
+            
                 // Save context
                 persistenceController.save()
-                
+            
                 print("✅ Challenge evaluation completed successfully")
-                task.setTaskCompleted(success: true)
+            task.setTaskCompleted(success: true)
                 
             } catch {
                 print("❌ Challenge evaluation failed: \(error)")
@@ -219,15 +219,15 @@ class BackgroundTaskManager: ObservableObject {
         }
         
         Task {
-            do {
+        do {
                 // Update location and detect hangouts
                 await locationManager.detectHangoutCandidates()
-                
+            
                 // Process any pending hangout sessions
                 await processPendingHangoutSessions()
-                
+            
                 print("✅ Hangout detection completed successfully")
-                task.setTaskCompleted(success: true)
+            task.setTaskCompleted(success: true)
                 
             } catch {
                 print("❌ Hangout detection failed: \(error)")
@@ -319,7 +319,7 @@ class BackgroundTaskManager: ObservableObject {
                 print("✅ Weekly rollup completed successfully")
                 task.setTaskCompleted(success: true)
                 
-            } catch {
+        } catch {
                 print("❌ Weekly rollup failed: \(error)")
                 task.setTaskCompleted(success: false)
             }

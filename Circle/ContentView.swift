@@ -2,9 +2,14 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import Combine
+import HealthKit
 
-// Import the actual LocationManager from Services
-// Note: In a real project, you'd import this properly or use @StateObject with dependency injection
+// MARK: - Service Imports
+// In a real Xcode project, these would be imported from the Services folder
+// For now, we need to make sure the service classes are accessible
+
+// Import HealthKitManager and MotionManager from Services
+// These are defined in Circle/Services/HealthKitManager.swift and Circle/Services/MotionManager.swift
 
 // MARK: - Models
 struct User: Identifiable, Hashable, Equatable {
@@ -57,10 +62,494 @@ struct HangoutSession: Identifiable, Hashable, Equatable {
     }
 }
 
+struct Challenge: Identifiable {
+    let id = UUID()
+    let title: String
+    let description: String
+    let participants: [String]
+    let points: Int
+    let verificationMethod: String
+    let isActive: Bool
+}
+
+// MARK: - Health Types (for UI compatibility)
+struct HealthInsight: Identifiable {
+    let id = UUID()
+    let type: InsightType
+    let title: String
+    let description: String
+    let icon: String
+}
+
+enum InsightType {
+    case achievement
+    case motivation
+    case warning
+    case tip
+}
+
+// MARK: - Service Integration
+// Note: In a real project, these would be imported from the Services folder
+// For now, we'll use the actual service classes that were created
+
+// The real HealthKitManager is in Circle/Services/HealthKitManager.swift
+// The real MotionManager is in Circle/Services/MotionManager.swift
+// These provide actual HealthKit integration and step counting
+
+// MARK: - Service Integration
+// Using the real service classes from Circle/Services/
+// These provide actual HealthKit integration and real data
+
+// Real HealthKitManager is in Circle/Services/HealthKitManager.swift
+// Real MotionManager is in Circle/Services/MotionManager.swift
+// Real StartupPermissionsManager is in Circle/Services/StartupPermissionsManager.swift
+
+// Note: In a real Xcode project, these would be properly imported
+// For now, we'll use placeholder classes that match the real interface
+
+// MARK: - Service Placeholders (for compilation)
+// These are temporary placeholders until proper imports are set up
+class HealthKitManager: ObservableObject {
+    static let shared = HealthKitManager()
+    
+    @Published var isAuthorized: Bool = false
+    @Published var todaysSteps: Int = 0
+    @Published var todaysDistance: Double = 0.0
+    @Published var todaysSleepHours: Double = 0.0
+    @Published var weeklySteps: Int = 0
+    @Published var monthlySteps: Int = 0
+    @Published var errorMessage: String?
+    
+    private let healthStore = HKHealthStore()
+    
+    private init() {
+        checkHealthKitAvailability()
+    }
+    
+    private func checkHealthKitAvailability() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            print("❌ HealthKit not available on this device")
+            return
+        }
+        
+        print("✅ HealthKit is available on this device")
+        
+        // Check current authorization status
+        let stepType = HKObjectType.quantityType(forIdentifier: .stepCount)!
+        let status = healthStore.authorizationStatus(for: stepType)
+        
+        print("📊 HealthKit authorization status: \(status.rawValue)")
+        
+        // Check if we're in simulator
+        #if targetEnvironment(simulator)
+        print("📱 Running in simulator - HealthKit entitlements may not work properly")
+        DispatchQueue.main.async {
+            self.isAuthorized = false
+            // Don't show error message in simulator - just use placeholder data
+            self.errorMessage = nil
+        }
+        #else
+        DispatchQueue.main.async {
+            self.isAuthorized = (status == .sharingAuthorized)
+            print("🔐 HealthKit authorized: \(self.isAuthorized)")
+            
+            // Auto-request authorization if not authorized
+            if !self.isAuthorized {
+                Task {
+                    await self.requestHealthKitAuthorization()
+                }
+            }
+        }
+        #endif
+    }
+    
+    func requestHealthKitAuthorization() async {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            print("❌ HealthKit not available for authorization")
+            return
+        }
+        
+        // Check if we're in simulator
+        #if targetEnvironment(simulator)
+        print("📱 Simulator detected - HealthKit entitlements don't work properly")
+        return
+        #endif
+        
+        print("🔐 Requesting HealthKit authorization...")
+        
+        let healthDataTypes: Set<HKObjectType> = [
+            HKObjectType.quantityType(forIdentifier: .stepCount)!,
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)!,
+            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
+            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.workoutType()
+        ]
+        
+        do {
+            try await healthStore.requestAuthorization(toShare: [], read: healthDataTypes)
+            
+            print("✅ HealthKit authorization completed")
+            
+            DispatchQueue.main.async {
+                self.isAuthorized = true
+                self.errorMessage = nil
+            }
+            
+            // Refresh data after authorization
+            await refreshHealthData()
+            
+        } catch {
+            print("❌ HealthKit authorization failed: \(error.localizedDescription)")
+            // Don't show error messages to user
+        }
+    }
+    
+    func refreshHealthData() async {
+        guard isAuthorized else { 
+            print("❌ Cannot refresh health data - not authorized")
+            return 
+        }
+        
+        print("🔄 Refreshing health data...")
+        
+        let today = Date()
+        
+        // First, let's check if there's any data available at all
+        await checkDataAvailability()
+        
+        // Fetch today's steps
+        let steps = await getStepsForDate(today)
+        print("👟 Steps fetched: \(steps)")
+        
+        // Fetch today's distance
+        let distance = await getDistanceForDate(today)
+        print("🏃 Distance fetched: \(distance)")
+        
+        // Fetch today's sleep
+        let sleepHours = await getSleepHoursForDate(today)
+        print("😴 Sleep hours fetched: \(sleepHours)")
+        
+        DispatchQueue.main.async {
+            self.todaysSteps = steps
+            self.todaysDistance = distance
+            self.todaysSleepHours = sleepHours
+            print("✅ Health data updated in UI")
+            
+            // If we got 0 data, it might be because there's no data in HealthKit
+            if steps == 0 && sleepHours == 0 && distance == 0 {
+                print("⚠️ No HealthKit data found - this is normal for new devices or simulators")
+                print("💡 To test with real data: Add some steps and sleep data to the Health app")
+                self.errorMessage = "No health data found. Make sure you have step and sleep data in the Health app."
+            } else {
+                print("✅ Real HealthKit data loaded successfully!")
+                print("📊 Steps: \(steps), Sleep: \(sleepHours)h, Distance: \(distance)m")
+            }
+        }
+    }
+    
+    private func checkDataAvailability() async {
+        print("🔍 Checking HealthKit data availability...")
+        
+        // Check if there are any step samples at all
+        let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+        let stepQuery = HKSampleQuery(sampleType: stepType, predicate: nil, limit: 1, sortDescriptors: nil) { _, samples, error in
+            if let error = error {
+                print("❌ Error checking step data: \(error.localizedDescription)")
+            } else if let samples = samples, !samples.isEmpty {
+                print("✅ Found \(samples.count) step samples in HealthKit")
+            } else {
+                print("⚠️ No step samples found in HealthKit")
+            }
+        }
+        
+        healthStore.execute(stepQuery)
+        
+        // Check if there are any sleep samples at all
+        let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+        let sleepQuery = HKSampleQuery(sampleType: sleepType, predicate: nil, limit: 1, sortDescriptors: nil) { _, samples, error in
+            if let error = error {
+                print("❌ Error checking sleep data: \(error.localizedDescription)")
+            } else if let samples = samples, !samples.isEmpty {
+                print("✅ Found \(samples.count) sleep samples in HealthKit")
+            } else {
+                print("⚠️ No sleep samples found in HealthKit")
+            }
+        }
+        
+        healthStore.execute(sleepQuery)
+    }
+    
+    private func getStepsForDate(_ date: Date) async -> Int {
+        guard isAuthorized else { 
+            print("❌ Cannot fetch steps - not authorized")
+            return 0 
+        }
+        
+        print("👟 Fetching steps for date: \(date)")
+        
+        let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        print("📅 Query range: \(startOfDay) to \(endOfDay)")
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: endOfDay, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                if let error = error {
+                    print("❌ Error fetching steps: \(error.localizedDescription)")
+                    continuation.resume(returning: 0)
+                    return
+                }
+                
+                let steps = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
+                print("👟 Steps result: \(steps)")
+                continuation.resume(returning: Int(steps))
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
+    private func getDistanceForDate(_ date: Date) async -> Double {
+        guard isAuthorized else { return 0.0 }
+        
+        let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: endOfDay, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+                if let error = error {
+                    print("Error fetching distance: \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                
+                let distance = result?.sumQuantity()?.doubleValue(for: HKUnit.meter()) ?? 0.0
+                continuation.resume(returning: distance)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
+    private func getSleepHoursForDate(_ date: Date) async -> Double {
+        guard isAuthorized else { return 0.0 }
+        
+        let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: endOfDay, options: .strictStartDate)
+        
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error = error {
+                    print("Error fetching sleep data: \(error.localizedDescription)")
+                    continuation.resume(returning: 0.0)
+                    return
+                }
+                
+                var totalSleepHours: Double = 0.0
+                
+                if let sleepSamples = samples as? [HKCategorySample] {
+                    for sample in sleepSamples {
+                        if sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue {
+                            let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                            totalSleepHours += duration / 3600.0 // Convert to hours
+                        }
+                    }
+                }
+                
+                continuation.resume(returning: totalSleepHours)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
+    func getHealthInsights() -> [HealthInsight] {
+        var insights: [HealthInsight] = []
+        
+        // Step goal achievement
+        let stepGoal = 10000
+        if todaysSteps >= stepGoal {
+            insights.append(HealthInsight(
+                type: .achievement,
+                title: "Step Goal Achieved! 🎉",
+                description: "You've reached your daily step goal of \(stepGoal) steps",
+                icon: "figure.walk"
+            ))
+        } else {
+            let remaining = stepGoal - todaysSteps
+            insights.append(HealthInsight(
+                type: .motivation,
+                title: "Keep Going! 💪",
+                description: "Just \(remaining) more steps to reach your daily goal",
+                icon: "figure.walk"
+            ))
+        }
+        
+        // Sleep quality
+        if todaysSleepHours >= 7.0 {
+            insights.append(HealthInsight(
+                type: .achievement,
+                title: "Great Sleep! 😴",
+                description: "You got \(String(format: "%.1f", todaysSleepHours)) hours of sleep",
+                icon: "bed.double"
+            ))
+        } else if todaysSleepHours < 6.0 {
+            insights.append(HealthInsight(
+                type: .warning,
+                title: "Need More Sleep ⚠️",
+                description: "Only \(String(format: "%.1f", todaysSleepHours)) hours of sleep. Aim for 7-9 hours",
+                icon: "bed.double"
+            ))
+        }
+        
+        return insights
+    }
+}
+
+class MotionManager: ObservableObject {
+    static let shared = MotionManager()
+    
+    @Published var todaysSteps: Int = 0
+    
+    private init() {}
+}
+
+class StartupPermissionsManager: ObservableObject {
+    static let shared = StartupPermissionsManager()
+    
+    @Published var permissionsStatus: [PermissionType: PermissionStatus] = [:]
+    @Published var isShowingPermissionsFlow = false
+    @Published var currentPermissionStep = 0
+    
+    enum PermissionType: String, CaseIterable {
+        case healthKit = "Health App"
+        case location = "Location"
+        case notifications = "Notifications"
+        case contacts = "Contacts"
+        case camera = "Camera"
+        case motion = "Motion & Fitness"
+        
+        var description: String {
+            switch self {
+            case .healthKit: return "Access your health data to track steps, sleep, and fitness goals"
+            case .location: return "Find friends nearby and verify location-based challenges"
+            case .notifications: return "Get reminders about challenges and hangout invitations"
+            case .contacts: return "Find friends who use Circle and invite them to circles"
+            case .camera: return "Take photos for challenges and photo stories"
+            case .motion: return "Track your activity and verify motion-based challenges"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .healthKit: return "heart.fill"
+            case .location: return "location.fill"
+            case .notifications: return "bell.fill"
+            case .contacts: return "person.2.fill"
+            case .camera: return "camera.fill"
+            case .motion: return "figure.walk"
+            }
+        }
+    }
+    
+    enum PermissionStatus {
+        case notRequested
+        case denied
+        case authorized
+        case restricted
+    }
+    
+    private init() {}
+    
+    func handleAppStartup() {
+        // Check if this is the first launch
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "HasLaunchedBefore")
+        
+        if !hasLaunchedBefore {
+            // First launch - show permissions flow
+            isShowingPermissionsFlow = true
+            UserDefaults.standard.set(true, forKey: "HasLaunchedBefore")
+        }
+    }
+    
+    func requestPermission(_ type: PermissionType) async {
+        switch type {
+        case .healthKit:
+            await HealthKitManager.shared.requestHealthKitAuthorization()
+        case .location:
+            // Location permission would be handled by LocationManager
+            break
+        case .notifications:
+            // Notification permission would be handled by NotificationManager
+            break
+        case .contacts:
+            // Contacts permission would be handled by ContactsManager
+            break
+        case .camera:
+            // Camera permission would be handled by CameraManager
+            break
+        case .motion:
+            // Motion permission is always available
+            permissionsStatus[.motion] = .authorized
+        }
+        
+        // Refresh status after requesting
+        checkAllPermissions()
+    }
+    
+    private func checkAllPermissions() {
+        // Check HealthKit permission
+        let healthKitStatus = HealthKitManager.shared.isAuthorized ? PermissionStatus.authorized : PermissionStatus.notRequested
+        permissionsStatus[.healthKit] = healthKitStatus
+        
+        // Other permissions would be checked here
+        permissionsStatus[.location] = .notRequested
+        permissionsStatus[.notifications] = .notRequested
+        permissionsStatus[.contacts] = .notRequested
+        permissionsStatus[.camera] = .notRequested
+        permissionsStatus[.motion] = .authorized
+    }
+    
+    func nextPermissionStep() {
+        currentPermissionStep += 1
+        if currentPermissionStep >= PermissionType.allCases.count {
+            isShowingPermissionsFlow = false
+        }
+    }
+    
+    func skipPermissionsFlow() {
+        isShowingPermissionsFlow = false
+    }
+    
+    func getCurrentPermission() -> PermissionType? {
+        let permissions = PermissionType.allCases
+        guard currentPermissionStep < permissions.count else { return nil }
+        return permissions[currentPermissionStep]
+    }
+    
+    func getPermissionStatus(_ type: PermissionType) -> PermissionStatus {
+        return permissionsStatus[type] ?? .notRequested
+    }
+}
+
 // MARK: - Services
 // LocationManager is now implemented in Circle/Services/LocationManager.swift
 // This is a local wrapper for UI purposes
-
+    
 class LocalLocationManager: NSObject, ObservableObject {
     private let locationManager = CLLocationManager()
     @Published var currentLocation: CLLocation?
@@ -819,11 +1308,40 @@ struct NoLocationPermissionView: View {
 
 
 struct ContentView: View {
+    @StateObject private var seamlessAuth = SeamlessAuthManager.shared
     @State private var selectedTab = 1 // Start with Circles tab (now index 1)
     @State private var dragOffset: CGFloat = 0
+    @State private var hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "onboarding_complete")
     
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
+            // Seamless onboarding (one-time only)
+            if !hasCompletedOnboarding {
+                SeamlessOnboardingView()
+                    .onAppear {
+                        // Check if actually needs onboarding
+                        if seamlessAuth.isReady {
+                            hasCompletedOnboarding = true
+                        }
+                    }
+            } else if !seamlessAuth.isReady {
+                // Loading state
+                ZStack {
+                    Color.blue.opacity(0.1).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Connecting to iCloud...")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .onAppear {
+                    seamlessAuth.checkiCloudStatus()
+                }
+            } else {
+                // Main app interface
+        ZStack {
             // Content area with swipe gesture
             GeometryReader { geometry in
                 HStack(spacing: 0) {
@@ -833,7 +1351,7 @@ struct ContentView: View {
                     CirclesView()
                         .frame(width: geometry.size.width)
             
-                    ChallengesView()
+            ChallengesView()
                         .frame(width: geometry.size.width)
                 }
                 .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
@@ -845,7 +1363,7 @@ struct ContentView: View {
                         }
                         .onEnded { value in
                             let threshold: CGFloat = 50
-                            if value.translation.width < -threshold && selectedTab < 2 {
+                                    if value.translation.width < -threshold && selectedTab < 2 {
                                 selectedTab += 1
                             } else if value.translation.width > threshold && selectedTab > 0 {
                                 selectedTab -= 1
@@ -855,72 +1373,60 @@ struct ContentView: View {
                 )
             }
             
-            // Custom Tab Bar - Native iPhone app feel
-            HStack(spacing: 0) {
-                TabBarButton(icon: "house", selectedIcon: "house.fill", label: "Home", isSelected: selectedTab == 0) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedTab = 0
+            // Custom Tab Bar - Pill shape like Find My (overlay at bottom)
+            VStack {
+                Spacer()
+                HStack(spacing: 0) {
+                    TabBarButton(icon: "house", selectedIcon: "house.fill", label: "Home", isSelected: selectedTab == 0) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            selectedTab = 0
+                        }
+                    }
+                    
+                            TabBarButton(icon: "circle.fill", selectedIcon: "circle.fill", label: "Circles", isSelected: selectedTab == 1) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            selectedTab = 1
+                        }
+                    }
+                    
+                            TabBarButton(icon: "target", selectedIcon: "target", label: "Circles", isSelected: selectedTab == 2) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            selectedTab = 2
+                        }
                     }
                 }
-                
-                TabBarButton(icon: "circle.fill", selectedIcon: "circle.fill", label: "Circles", isSelected: selectedTab == 1) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedTab = 1
-                    }
-                }
-                
-                TabBarButton(icon: "target", selectedIcon: "target", label: "Challenges", isSelected: selectedTab == 2) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedTab = 2
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(16)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            }
+        }
+        }
+        .onAppear {
+            // Handle app startup permissions
+            permissionsManager.handleAppStartup()
         }
     }
 }
 
 struct HomeView: View {
+    // Use the real HealthKitManager from Services
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var motionManager = MotionManager.shared
     @State private var healthInsights: [HealthInsight] = []
+    @State private var isHealthKitAuthorized = false
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Welcome Header - Native iPhone style
+                    // Clean Header
                     VStack(spacing: 16) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Good morning")
-                                    .font(.title2)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.primary)
-                                
-                                Text("Ready to connect?")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            // Minimalist profile indicator (like native apps)
-                            Circle()
-                                .fill(Color.blue.gradient)
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text("👤")
-                                        .font(.title3)
-                                )
-                        }
-                        
-                        // Health Stats - Native style
+                        // Health Stats - Native style with real data
                         HStack(spacing: 16) {
                             HealthStatCard(
                                 title: "Steps",
@@ -946,8 +1452,8 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // Health Insights
-                    if !healthInsights.isEmpty {
+                    // Health Insights - Only show if authorized
+                    if healthKitManager.isAuthorized && !healthInsights.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Health Insights")
                                 .font(.headline)
@@ -967,8 +1473,8 @@ struct HomeView: View {
                     // Active Challenges
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Active Challenges")
-                                .font(.headline)
+                        Text("Active Challenges")
+                            .font(.headline)
                             
                             Spacer()
                             
@@ -977,8 +1483,8 @@ struct HomeView: View {
                             }
                             .font(.subheadline)
                             .foregroundColor(.blue)
-                        }
-                        .padding(.horizontal, 20)
+                }
+                .padding(.horizontal, 20)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -992,15 +1498,21 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 20)
             }
-            .navigationTitle("Circle")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
-                loadHealthInsights()
+                loadHealthData()
             }
         }
     }
     
-    private func loadHealthInsights() {
+    private func loadHealthData() {
+        // Always refresh health data to get latest from Health app
+        Task {
+            await healthKitManager.refreshHealthData()
+        }
+        
+        // Load health insights from the real HealthKitManager
         healthInsights = healthKitManager.getHealthInsights()
     }
     
@@ -1061,7 +1573,7 @@ struct HealthStatCard: View {
                 .font(.title3)
                 .fontWeight(.bold)
             
-            Text(title)
+                Text(title)
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -1091,7 +1603,7 @@ struct HealthInsightCard: View {
             
             Text(insight.description)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                    .foregroundColor(.secondary)
                 .multilineTextAlignment(.leading)
         }
         .padding(12)
@@ -1111,57 +1623,57 @@ struct HealthInsightCard: View {
 }
 
 struct ChallengeCard: View {
-    let title: String
-    let progress: Double
+    let challenge: Challenge
     
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "figure.walk")
-                .font(.title2)
-                .foregroundColor(.secondary)
-                .frame(width: 40, height: 40)
-                .background(
-                    Circle()
-                        .fill(Color(.systemGray6))
-                        .overlay(
-                            Circle()
-                                .stroke(Color(.systemGray5), lineWidth: 1)
-                        )
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: challengeIcon)
+                    .foregroundColor(.blue)
                 
-                Text("2 days left")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
+                Text(challenge.title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
             
             Spacer()
             
-            // Progress Indicator
+                Text("\(challenge.points) pts")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
+            }
+            
+            Text(challenge.description)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+            
+            HStack {
+                Text("\(challenge.participants.count) participants")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                // Progress indicator
             Circle()
-                .stroke(Color(.systemGray5), lineWidth: 2)
-                .frame(width: 24, height: 24)
-                .overlay(
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(Color(.systemGray4), lineWidth: 2)
-                        .rotationEffect(.degrees(-90))
-                )
+                    .fill(Color.blue)
+                    .frame(width: 8, height: 8)
+            }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(.systemGray5), lineWidth: 1)
-                )
-        )
+        .padding(12)
+        .frame(width: 180)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
+    private var challengeIcon: String {
+        switch challenge.verificationMethod {
+        case "motion": return "figure.walk"
+        case "location": return "location"
+        case "camera": return "camera"
+        default: return "target"
+        }
     }
 }
 
@@ -1169,6 +1681,10 @@ struct ChallengeCard: View {
 struct CirclesView: View {
     @StateObject private var locationManager = LocalLocationManager()
     @StateObject private var hangoutEngine = HangoutEngine.shared
+    @StateObject private var seamlessAuth = SeamlessAuthManager.shared
+    @StateObject private var contactDiscovery = ContactDiscoveryManager.shared
+    @StateObject private var seamlessLocation = SeamlessLocationManager.shared
+    
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
@@ -1177,6 +1693,7 @@ struct CirclesView: View {
     @State private var circleMembers: [User] = []
     @State private var activeHangouts: [HangoutSession] = []
     @State private var weeklyHangouts: [HangoutSession] = []
+    @State private var useRealFriends = true // Toggle between real and mock data
     
     var body: some View {
         NavigationView {
@@ -1198,9 +1715,18 @@ struct CirclesView: View {
                                 selectedFriend = friend
                             }
                         )
+                        .ignoresSafeArea(.all, edges: .all)
                         .onAppear {
                             setupLocationTracking()
-                            loadCircleData()
+                            // Delay loading circle data until we have location
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                loadCircleData()
+                            }
+                            
+                            // Refresh circle data every 10 seconds
+                            Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+                                loadCircleData()
+                            }
                         }
                         
                         // Stats Overlay (screen overlay)
@@ -1213,19 +1739,34 @@ struct CirclesView: View {
                                 )
                                 .padding(.trailing, 16)
                             }
-                            .padding(.top, 16)
+                            .padding(.top, 60) // Move below Dynamic Island
                             
                             Spacer()
                         }
                     }
+                    .ignoresSafeArea(.all, edges: .all)
                 }
             }
-            .navigationTitle("Circles")
+            .navigationTitle("")
+            .navigationBarHidden(true)
             .sheet(item: $selectedFriend) { friend in
                 FriendDetailSheet(friend: friend)
                     .onAppear {
                         print("🎯 Sheet presenting for: \(friend.name)")
                     }
+            }
+        }
+        .onAppear {
+            // Auto-start location sharing (seamless)
+            if !seamlessLocation.isSharing {
+                seamlessLocation.autoStart()
+            }
+            
+            // Discover friends from contacts (one-time)
+            if contactDiscovery.discoveredFriends.isEmpty {
+                Task {
+                    try? await contactDiscovery.discoverFriendsFromContacts()
+                }
             }
         }
     }
@@ -1238,20 +1779,73 @@ struct CirclesView: View {
     }
     
     private func loadCircleData() {
-        // Load ALL your friends - spread them out geographically like real friends would be
-        circleMembers = [
-            User(name: "You", location: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194), profileEmoji: "👤"),
-            User(name: "Sarah", location: CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4094), profileEmoji: "👩‍💼"), // North East
-            User(name: "Mike", location: CLLocationCoordinate2D(latitude: 37.7649, longitude: -122.4294), profileEmoji: "👨‍💻"), // South West  
-            User(name: "Josh", location: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.3994), profileEmoji: "👨‍🎨"), // East
-            User(name: "Emma", location: CLLocationCoordinate2D(latitude: 37.7949, longitude: -122.4194), profileEmoji: "👩‍🎓"), // North
-            User(name: "Alex", location: CLLocationCoordinate2D(latitude: 37.7549, longitude: -122.4094), profileEmoji: "👨‍🍳"), // South East
-            User(name: "Lisa", location: CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4394), profileEmoji: "👩‍⚕️") // North West
-        ]
+        // Check if we have real friends to display
+        if useRealFriends && !friendManager.friends.isEmpty {
+            loadRealFriends()
+        } else {
+            loadMockFriends()
+        }
         
         // Load hangout data
         activeHangouts = hangoutEngine.getActiveHangouts()
         weeklyHangouts = hangoutEngine.getWeeklyHangouts()
+        
+        print("👥 Active hangouts: \(activeHangouts.count), Weekly hangouts: \(weeklyHangouts.count)")
+    }
+    
+    private func loadRealFriends() {
+        print("📱 Loading REAL friends from contacts")
+        
+        var members: [User] = []
+        
+        // Add yourself
+        if let location = locationManager.currentLocation?.coordinate {
+            let displayName = seamlessAuth.displayName ?? "You"
+            members.append(User(
+                name: displayName,
+                location: location,
+                profileEmoji: "👤"
+            ))
+            print("✅ Added you: \(location.latitude), \(location.longitude)")
+        }
+        
+        // Add discovered friends with their locations
+        for (userID, friendLocation) in seamlessLocation.friendsLocations {
+            members.append(User(
+                name: friendLocation.displayName,
+                location: friendLocation.coordinate,
+                profileEmoji: "👥"
+            ))
+            print("✅ Added friend: \(friendLocation.displayName) at \(friendLocation.latitude), \(friendLocation.longitude)")
+        }
+        
+        circleMembers = members
+        print("📍 Loaded \(circleMembers.count) people from contacts (including you)")
+    }
+    
+    private func loadMockFriends() {
+        print("🧪 Loading MOCK friends for testing")
+        
+        // Get user's current location or use default
+        let userLat = locationManager.currentLocation?.coordinate.latitude ?? 37.7749
+        let userLon = locationManager.currentLocation?.coordinate.longitude ?? -122.4194
+        
+        print("🗺️ Loading circle data at location: \(userLat), \(userLon)")
+        
+        // Create mock friends relative to user's location (within ~5km radius)
+        let offset = 0.01 // Roughly 1km offset
+        
+        circleMembers = [
+            User(name: "You", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon), profileEmoji: "👤"),
+            User(name: "Sarah", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon - offset), profileEmoji: "👩‍💼"),
+            User(name: "Mike", location: CLLocationCoordinate2D(latitude: userLat - offset, longitude: userLon + offset), profileEmoji: "👨‍💻"),
+            User(name: "Josh", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon - (offset * 2)), profileEmoji: "👨‍🎨"),
+            User(name: "Emma", location: CLLocationCoordinate2D(latitude: userLat + (offset * 2), longitude: userLon), profileEmoji: "👩‍🎓"),
+            User(name: "Alex", location: CLLocationCoordinate2D(latitude: userLat - (offset * 1.5), longitude: userLon - offset), profileEmoji: "👨‍🍳"),
+            User(name: "Lisa", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon + (offset * 1.5)), profileEmoji: "👩‍⚕️")
+        ]
+        
+        print("📍 Created \(circleMembers.count) MOCK circle members around user location")
     }
 }
 
@@ -1271,103 +1865,42 @@ struct LeaderboardView: View {
 }
 
 struct ChallengesView: View {
-    @State private var selectedChallenge: Challenge?
-    @State private var activeChallenges: [Challenge] = []
-    
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Active Challenges List
-                if activeChallenges.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "target")
-                            .font(.system(size: 60))
-                            .foregroundColor(.secondary)
-                        
-                        Text("No Active Challenges")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                        
-                        Text("Create your first challenge to start competing with friends!")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        
-                        Button("Create Challenge") {
-                            // Show challenge creation flow
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .padding(.top, 8)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List(activeChallenges) { challenge in
-                        ChallengeRow(challenge: challenge) {
-                            selectedChallenge = challenge
-                        }
-                    }
-                    .listStyle(.plain)
-                }
+            VStack {
+                Spacer()
                 
-                // Create New Challenge Button
-                if !activeChallenges.isEmpty {
-                    Button("Create New Challenge") {
-                        // Show challenge creation flow
+                Image(systemName: "target")
+                    .font(.system(size: 60))
+                    .foregroundColor(.secondary)
+                
+                Text("Challenges")
+                    .font(.title2)
+                    .fontWeight(.medium)
+                    .padding(.top, 16)
+                
+                Text("View and create challenges with friends")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                
+                Spacer()
+            }
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        // Plus button action - could open challenge creation
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2)
+                            .foregroundColor(.primary)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .padding()
                 }
-            }
-            .navigationTitle("Challenges")
-            .sheet(item: $selectedChallenge) { challenge in
-                ChallengeDetailView(challenge: challenge)
-            }
-            .onAppear {
-                loadActiveChallenges()
             }
         }
     }
-    
-    private func loadActiveChallenges() {
-        // Mock data for now - in real implementation, this would load from Core Data
-        activeChallenges = [
-            Challenge(
-                title: "Daily Steps Challenge",
-                description: "Walk 10,000 steps every day this week",
-                participants: ["You", "Sarah", "Mike", "Emma"],
-                points: 50,
-                verificationMethod: "motion",
-                isActive: true
-            ),
-            Challenge(
-                title: "Gym Hangout",
-                description: "Work out together at the gym",
-                participants: ["You", "Alex", "Josh"],
-                points: 30,
-                verificationMethod: "location",
-                isActive: true
-            ),
-            Challenge(
-                title: "Morning Run",
-                description: "Run 5K before 8 AM",
-                participants: ["You", "Sarah", "Mike"],
-                points: 40,
-                verificationMethod: "motion",
-                isActive: true
-            )
-        ]
-    }
-}
-
-struct Challenge: Identifiable {
-    let id = UUID()
-    let title: String
-    let description: String
-    let participants: [String]
-    let points: Int
-    let verificationMethod: String
-    let isActive: Bool
 }
 
 struct ChallengeRow: View {
@@ -1412,7 +1945,7 @@ struct ChallengeRow: View {
                 Spacer()
                 
                 // Progress indicator
-                VStack {
+            VStack {
                     Image(systemName: "chevron.right")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -1459,12 +1992,12 @@ struct ChallengeDetailView: View {
                         VStack(alignment: .leading) {
                             Text(challenge.title)
                                 .font(.title2)
-                                .fontWeight(.bold)
+                    .fontWeight(.bold)
                             
                             Text(challenge.description)
                                 .font(.body)
-                                .foregroundColor(.secondary)
-                        }
+                    .foregroundColor(.secondary)
+            }
                         
                         Spacer()
                     }
@@ -1649,6 +2182,596 @@ struct TabBarButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Permissions Flow View
+struct PermissionsFlowView: View {
+    @StateObject private var permissionsManager = StartupPermissionsManager.shared
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            // Background
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 32) {
+                // Header
+                VStack(spacing: 16) {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue)
+                        .scaleEffect(isAnimating ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isAnimating)
+                    
+                    Text("Welcome to Circle")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Let's set up your permissions to get started")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                
+                // Current Permission Card
+                if let currentPermission = permissionsManager.getCurrentPermission() {
+                    PermissionCard(
+                        permission: currentPermission,
+                        status: permissionsManager.getPermissionStatus(currentPermission),
+                        onAllow: {
+                            Task {
+                                await permissionsManager.requestPermission(currentPermission)
+                                permissionsManager.nextPermissionStep()
+                            }
+                        },
+                        onSkip: {
+                            permissionsManager.nextPermissionStep()
+                        }
+                    )
+                }
+                
+                // Progress Indicator
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(0..<StartupPermissionsManager.PermissionType.allCases.count, id: \.self) { index in
+                            Circle()
+                                .fill(index <= permissionsManager.currentPermissionStep ? Color.blue : Color(.systemGray4))
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    
+                    Text("Step \(permissionsManager.currentPermissionStep + 1) of \(StartupPermissionsManager.PermissionType.allCases.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Skip All Button
+                Button("Skip All Permissions") {
+                    permissionsManager.skipPermissionsFlow()
+                }
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 40)
+        }
+        .onAppear {
+            isAnimating = true
+        }
+    }
+}
+
+struct PermissionCard: View {
+    let permission: StartupPermissionsManager.PermissionType
+    let status: StartupPermissionsManager.PermissionStatus
+    let onAllow: () -> Void
+    let onSkip: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Permission Icon
+            Image(systemName: permission.icon)
+                .font(.system(size: 50))
+                .foregroundColor(.blue)
+                .frame(width: 80, height: 80)
+                .background(
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                )
+            
+            // Permission Title
+            Text(permission.rawValue)
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            // Permission Description
+            Text(permission.description)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+            
+            // Status Indicator
+            HStack {
+                Image(systemName: statusIcon)
+                    .foregroundColor(statusColor)
+                
+                Text(statusText)
+                    .font(.subheadline)
+                    .foregroundColor(statusColor)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(statusColor.opacity(0.1))
+            )
+            
+            // Action Buttons
+            HStack(spacing: 16) {
+                Button("Skip") {
+                    onSkip()
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                
+                Button("Allow") {
+                    onAllow()
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .disabled(status == .authorized)
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(.systemGray4), lineWidth: 1)
+                )
+        )
+    }
+    
+    private var statusIcon: String {
+        switch status {
+        case .notRequested: return "questionmark.circle"
+        case .denied: return "xmark.circle"
+        case .authorized: return "checkmark.circle.fill"
+        case .restricted: return "exclamationmark.triangle"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch status {
+        case .notRequested: return .orange
+        case .denied: return .red
+        case .authorized: return .green
+        case .restricted: return .orange
+        }
+    }
+    
+    private var statusText: String {
+        switch status {
+        case .notRequested: return "Not Requested"
+        case .denied: return "Denied"
+        case .authorized: return "Authorized"
+        case .restricted: return "Restricted"
+        }
+    }
+}
+
+// MARK: - Story System Components
+
+// Premium Story Circle Component
+struct StoryCircleView: View {
+    @StateObject private var storyManager = PhotoStoriesManager.shared
+    @State private var showingStories = false
+    
+    var body: some View {
+        Button(action: {
+            showingStories = true
+        }) {
+            ZStack {
+                // Black circle background
+                Circle()
+                    .fill(Color.black)
+                    .frame(width: 40, height: 40)
+                
+                       // White number for people with unviewed stories
+                       if storyManager.unviewedPeopleCount > 0 {
+                           Text("\(storyManager.unviewedPeopleCount)")
+                               .font(.system(size: 16, weight: .semibold))
+                               .foregroundColor(.white)
+                       }
+            }
+        }
+        .sheet(isPresented: $showingStories) {
+            StoryViewer()
+        }
+        .onAppear {
+            storyManager.loadStories()
+        }
+    }
+}
+
+// Story Viewer with Proper Instagram/Snapchat Mechanics
+struct StoryViewer: View {
+    @StateObject private var storyManager = PhotoStoriesManager.shared
+    @State private var currentPersonIndex = 0
+    @State private var currentStoryIndex = 0
+    @Environment(\.dismiss) private var dismiss
+    
+    private var storiesByCreator: [(String, [PhotoStory])] {
+        let grouped = storyManager.getStoriesByCreator()
+        return grouped.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
+    }
+    
+    private var currentPerson: String {
+        guard currentPersonIndex < storiesByCreator.count else { return "" }
+        return storiesByCreator[currentPersonIndex].0
+    }
+    
+    private var currentPersonStories: [PhotoStory] {
+        guard currentPersonIndex < storiesByCreator.count else { return [] }
+        return storiesByCreator[currentPersonIndex].1
+    }
+    
+    var body: some View {
+        ZStack {
+            // Black background
+            Color.black.ignoresSafeArea()
+            
+            if storiesByCreator.isEmpty {
+                // Empty state
+                VStack(spacing: 20) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white.opacity(0.5))
+                    
+                    Text("No Stories Yet")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                    
+                    Text("Create your first story by tagging friends")
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+            } else {
+                // Current story content
+                if currentStoryIndex < currentPersonStories.count {
+                    StoryContentView(
+                        story: currentPersonStories[currentStoryIndex],
+                        creator: currentPerson,
+                        currentPersonIndex: $currentPersonIndex,
+                        currentStoryIndex: $currentStoryIndex,
+                        totalPeople: storiesByCreator.count,
+                        totalStoriesForCurrentPerson: currentPersonStories.count,
+                        onDismiss: { dismiss() }
+                    )
+                }
+            }
+        }
+        .onAppear {
+            storyManager.loadStories()
+        }
+    }
+}
+
+// Individual Story Content with Proper Progress Bars
+struct StoryContentView: View {
+    let story: PhotoStory
+    let creator: String
+    @Binding var currentPersonIndex: Int
+    @Binding var currentStoryIndex: Int
+    let totalPeople: Int
+    let totalStoriesForCurrentPerson: Int
+    let onDismiss: () -> Void
+    @State private var progress: Double = 0
+    @State private var timer: Timer?
+    @StateObject private var storyManager = PhotoStoriesManager.shared
+    
+    var body: some View {
+        ZStack {
+            // Story image
+            AsyncImage(url: story.imageURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .ignoresSafeArea()
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .ignoresSafeArea()
+            }
+            
+            // Story overlay
+            VStack {
+                // Top bar with progress bars for current person
+                HStack(spacing: 4) {
+                    ForEach(0..<totalStoriesForCurrentPerson, id: \.self) { index in
+                        Rectangle()
+                            .fill(index < currentStoryIndex ? Color.white : Color.white.opacity(0.3))
+                            .frame(height: 2)
+                            .overlay(
+                                // Progress animation ONLY for current story
+                                Rectangle()
+                                    .fill(Color.white)
+                                    .frame(height: 2)
+                                    .scaleEffect(x: index == currentStoryIndex ? progress : 0, anchor: .leading)
+                            )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                
+                Spacer()
+                
+                // Bottom info - simplified (name only)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(story.title)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+            }
+        }
+        .onTapGesture { location in
+            handleTap(at: location)
+        }
+               .onAppear {
+                   // Mark story as viewed when it starts
+                   storyManager.markStoryAsViewed(story.id)
+                   startProgressTimer()
+               }
+        .onDisappear {
+            stopProgressTimer()
+        }
+    }
+    
+    private func handleTap(at location: CGPoint) {
+        let screenWidth = UIScreen.main.bounds.width
+        let tapX = location.x
+        
+        // Stop current timer
+        stopProgressTimer()
+        
+        if tapX < screenWidth / 2 {
+            // Tap left - previous story (DON'T mark as viewed)
+            if currentStoryIndex > 0 {
+                currentStoryIndex -= 1
+                progress = 0 // Reset progress immediately
+                DispatchQueue.main.async {
+                    self.startProgressTimer() // Restart timer for new story
+                }
+            } else if currentPersonIndex > 0 {
+                // Move to previous person's last story
+                currentPersonIndex -= 1
+                currentStoryIndex = totalStoriesForCurrentPerson - 1
+                progress = 0 // Reset progress immediately
+                DispatchQueue.main.async {
+                    self.startProgressTimer() // Restart timer for new story
+                }
+            }
+        } else {
+            // Tap right - next story
+            if currentStoryIndex < totalStoriesForCurrentPerson - 1 {
+                // Next story in same person's sequence
+                currentStoryIndex += 1
+                progress = 0
+                startProgressTimer() // Restart timer for new story
+            } else {
+                // Finished all stories for this person
+                if currentPersonIndex < totalPeople - 1 {
+                    // Move to next person's first story
+                    currentPersonIndex += 1
+                    currentStoryIndex = 0
+                    progress = 0
+                    startProgressTimer() // Restart timer for new story
+                } else {
+                    // Finished all stories - close and return to home
+                    onDismiss()
+                }
+            }
+        }
+    }
+    
+           private func startProgressTimer() {
+               timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                   progress += 0.02
+                   if progress >= 1.0 {
+                       // Move to next story
+                       if currentStoryIndex < totalStoriesForCurrentPerson - 1 {
+                    // Next story in same person's sequence
+                    currentStoryIndex += 1
+                } else {
+                    // Finished all stories for this person
+                    if currentPersonIndex < totalPeople - 1 {
+                        // Move to next person's first story
+                        currentPersonIndex += 1
+                        currentStoryIndex = 0
+                    } else {
+                        // Finished all stories - close and return to home
+                        onDismiss()
+                    }
+                }
+                progress = 0
+            }
+        }
+    }
+    
+    private func stopProgressTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
+// Photo Story Model
+struct PhotoStory: Identifiable {
+    let id: String
+    let imageURL: URL?
+    let title: String
+    let taggedFriends: [String] // Friend IDs
+    let creator: String
+    let timestamp: Date
+    let isViewed: Bool
+    
+    init(id: String = UUID().uuidString, imageURL: URL? = nil, title: String, taggedFriends: [String], creator: String, timestamp: Date = Date(), isViewed: Bool = false) {
+        self.id = id
+        self.imageURL = imageURL
+        self.title = title
+        self.taggedFriends = taggedFriends
+        self.creator = creator
+        self.timestamp = timestamp
+        self.isViewed = isViewed
+    }
+}
+
+// Photo Stories Manager
+class PhotoStoriesManager: ObservableObject {
+    static let shared = PhotoStoriesManager()
+    
+    @Published var stories: [PhotoStory] = []
+    @Published var unviewedPeopleCount: Int = 0
+    
+    private init() {}
+    
+    func loadStories() {
+        // Only load stories if we don't have any yet (first time)
+        guard stories.isEmpty else { return }
+        
+        // Mock data with Josh (2 stories) and Emma (5 stories)
+        stories = [
+            // Josh's stories (2 stories)
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "josh1", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Josh",
+                taggedFriends: ["friend1", "friend2"],
+                creator: "josh",
+                timestamp: Date().addingTimeInterval(-3600) // 1 hour ago
+            ),
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "josh2", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Josh",
+                taggedFriends: ["friend1", "friend2"],
+                creator: "josh",
+                timestamp: Date().addingTimeInterval(-7200) // 2 hours ago
+            ),
+            
+            // Emma's stories (5 stories)
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "emma1", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Emma",
+                taggedFriends: ["friend1", "friend3"],
+                creator: "emma",
+                timestamp: Date().addingTimeInterval(-1800) // 30 minutes ago
+            ),
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "emma2", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Emma",
+                taggedFriends: ["friend1", "friend3"],
+                creator: "emma",
+                timestamp: Date().addingTimeInterval(-5400) // 1.5 hours ago
+            ),
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "emma3", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Emma",
+                taggedFriends: ["friend1", "friend3"],
+                creator: "emma",
+                timestamp: Date().addingTimeInterval(-9000) // 2.5 hours ago
+            ),
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "emma4", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Emma",
+                taggedFriends: ["friend1", "friend3"],
+                creator: "emma",
+                timestamp: Date().addingTimeInterval(-12600) // 3.5 hours ago
+            ),
+            PhotoStory(
+                imageURL: Bundle.main.url(forResource: "emma5", withExtension: "jpg", subdirectory: "StoryImages"),
+                title: "Emma",
+                taggedFriends: ["friend1", "friend3"],
+                creator: "emma",
+                timestamp: Date().addingTimeInterval(-16200) // 4.5 hours ago
+            )
+               ]
+               
+               updateUnviewedPeopleCount()
+           }
+    
+    func markStoryAsViewed(_ storyId: String) {
+        if let index = stories.firstIndex(where: { $0.id == storyId }) {
+            // Only mark if not already viewed
+            guard !stories[index].isViewed else { return }
+            
+            print("📝 Marking story as viewed: \(storyId)")
+            objectWillChange.send()
+            stories[index] = PhotoStory(
+                id: stories[index].id,
+                imageURL: stories[index].imageURL,
+                title: stories[index].title,
+                taggedFriends: stories[index].taggedFriends,
+                creator: stories[index].creator,
+                timestamp: stories[index].timestamp,
+                isViewed: true
+            )
+            updateUnviewedPeopleCount()
+            print("📊 Updated unviewed people count: \(unviewedPeopleCount)")
+        }
+    }
+    
+    func markAllPersonStoriesAsViewed(creator: String) {
+        objectWillChange.send()
+        for index in stories.indices where stories[index].creator == creator {
+            stories[index] = PhotoStory(
+                id: stories[index].id,
+                imageURL: stories[index].imageURL,
+                title: stories[index].title,
+                taggedFriends: stories[index].taggedFriends,
+                creator: stories[index].creator,
+                timestamp: stories[index].timestamp,
+                isViewed: true
+            )
+        }
+        updateUnviewedPeopleCount()
+    }
+    
+    private func updateUnviewedPeopleCount() {
+        // Count unique people whose stories haven't ALL been viewed
+        var peopleWithUnviewedStories = Set<String>()
+        
+        for creator in Set(stories.map { $0.creator }) {
+            let creatorStories = stories.filter { $0.creator == creator }
+            let hasUnviewedStories = creatorStories.contains { !$0.isViewed }
+            if hasUnviewedStories {
+                peopleWithUnviewedStories.insert(creator)
+            }
+            print("👤 Creator: \(creator), Stories: \(creatorStories.count), Unviewed: \(creatorStories.filter { !$0.isViewed }.count), Has Unviewed: \(hasUnviewedStories)")
+        }
+        
+        unviewedPeopleCount = peopleWithUnviewedStories.count
+        print("🔢 Total unviewed people count: \(unviewedPeopleCount)")
+    }
+    
+    // Get stories grouped by creator
+    func getStoriesByCreator() -> [String: [PhotoStory]] {
+        return Dictionary(grouping: stories) { $0.creator }
+    }
+    
+    // Check if all stories from a creator have been viewed
+    func areAllStoriesViewed(for creator: String) -> Bool {
+        let creatorStories = stories.filter { $0.creator == creator }
+        return creatorStories.allSatisfy { $0.isViewed }
     }
 }
 
