@@ -11,6 +11,138 @@ import HealthKit
 // Import HealthKitManager and MotionManager from Services
 // These are defined in Circle/Services/HealthKitManager.swift and Circle/Services/MotionManager.swift
 
+// MARK: - Seamless Auth Manager (stub for compilation)
+@MainActor
+class SeamlessAuthManager: ObservableObject {
+    static let shared = SeamlessAuthManager()
+    @Published var isReady = true
+    @Published var currentUserID: String? = "default-user"
+    @Published var displayName: String? = "User"
+    @Published var isSignedIn = true
+    
+    private init() {}
+    
+    func checkiCloudStatus() {
+        print("🔐 Checking iCloud status...")
+        isReady = true
+        isSignedIn = true
+    }
+}
+
+class ContactDiscoveryManager: ObservableObject {
+    static let shared = ContactDiscoveryManager()
+    @Published var discoveredFriends: [DiscoveredFriend] = []
+    @Published var isDiscovering = false
+    
+    private init() {}
+    
+    func discoverFriendsFromContacts() async throws {
+        print("🔍 Discovering friends from contacts...")
+    }
+}
+
+struct DiscoveredFriend: Identifiable {
+    let id = UUID()
+    let userID: String
+    let contactName: String
+}
+
+@MainActor
+class SeamlessLocationManager: NSObject, ObservableObject {
+    static let shared = SeamlessLocationManager()
+    @Published var friendsLocations: [String: FriendLocation] = [:]
+    @Published var isSharing = false
+    @Published var lastUpdate: Date?
+    
+    private override init() {
+        super.init()
+    }
+    
+    func autoStart() {
+        print("📍 Auto-starting location sharing...")
+        isSharing = true
+    }
+}
+
+struct FriendLocation: Identifiable {
+    let id = UUID()
+    let userID: String
+    let displayName: String
+    let latitude: Double
+    let longitude: Double
+    let timestamp: Date
+    
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+struct SeamlessOnboardingView: View {
+    @StateObject private var authManager = SeamlessAuthManager.shared
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Spacer()
+                
+                Text("⭕️")
+                    .font(.system(size: 100))
+                
+                Text("Circle")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Text("Social life, verified")
+                    .font(.title3)
+                    .foregroundColor(.white.opacity(0.9))
+                
+                Spacer()
+                
+                Button("Get Started") {
+                    UserDefaults.standard.set(true, forKey: "onboarding_complete")
+                    authManager.isReady = true
+                }
+                .font(.headline)
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.white)
+                .cornerRadius(12)
+                .padding(.horizontal, 40)
+                
+                Spacer()
+                    .frame(height: 60)
+            }
+        }
+    }
+}
+
+class FriendManager: ObservableObject {
+    static let shared = FriendManager()
+    @Published var friends: [UserProfile] = []
+    private init() {}
+}
+
+struct UserProfile {
+    let recordName: String
+    let displayName: String
+    let profileEmoji: String
+    let latitude: Double?
+    let longitude: Double?
+    
+    var location: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+}
+
 // MARK: - Models
 struct User: Identifiable, Hashable, Equatable {
     let id = UUID()
@@ -1407,8 +1539,8 @@ struct ContentView: View {
         }
         }
         .onAppear {
-            // Handle app startup permissions
-            permissionsManager.handleAppStartup()
+            // Handle app startup - seamless auth
+            seamlessAuth.checkiCloudStatus()
         }
     }
 }
@@ -1780,7 +1912,7 @@ struct CirclesView: View {
     
     private func loadCircleData() {
         // Check if we have real friends to display
-        if useRealFriends && !friendManager.friends.isEmpty {
+        if useRealFriends && !seamlessLocation.friendsLocations.isEmpty {
             loadRealFriends()
         } else {
             loadMockFriends()
