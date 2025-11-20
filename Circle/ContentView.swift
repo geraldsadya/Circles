@@ -1444,6 +1444,7 @@ struct ContentView: View {
     @State private var selectedTab = 1 // Start with Circles tab (now index 1)
     @State private var dragOffset: CGFloat = 0
     @State private var hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "onboarding_complete")
+    @State private var isSheetExpanded = false
     
     var body: some View {
         Group {
@@ -1474,66 +1475,19 @@ struct ContentView: View {
             } else {
                 // Main app interface
         ZStack {
-            // Content area with swipe gesture
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    HomeView()
-                        .frame(width: geometry.size.width)
-                    
-                    CirclesView()
-                        .frame(width: geometry.size.width)
+            // Content area - always show Circles map
+            CirclesView()
+                .blur(radius: isSheetExpanded ? 15 : 0)  // Heavier blur when sheet is up (Find My style)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSheetExpanded)
+                .allowsHitTesting(!isSheetExpanded)  // Disable interaction when sheet is expanded
             
-            ChallengesView()
-                        .frame(width: geometry.size.width)
-                }
-                .offset(x: -CGFloat(selectedTab) * geometry.size.width + dragOffset)
-                .animation(.interactiveSpring(), value: selectedTab)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            dragOffset = value.translation.width
-                        }
-                        .onEnded { value in
-                            let threshold: CGFloat = 50
-                                    if value.translation.width < -threshold && selectedTab < 2 {
-                                selectedTab += 1
-                            } else if value.translation.width > threshold && selectedTab > 0 {
-                                selectedTab -= 1
-                            }
-                            dragOffset = 0
-                        }
-                )
-            }
-            
-            // Custom Tab Bar - Pill shape like Find My (overlay at bottom)
+            // Draggable bottom sheet with tabs (Find My style)
             VStack {
                 Spacer()
-                HStack(spacing: 0) {
-                    TabBarButton(icon: "house", selectedIcon: "house.fill", label: "Home", isSelected: selectedTab == 0) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedTab = 0
-                        }
-                    }
-                    
-                            TabBarButton(icon: "circle.fill", selectedIcon: "circle.fill", label: "Circles", isSelected: selectedTab == 1) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedTab = 1
-                        }
-                    }
-                    
-                            TabBarButton(icon: "target", selectedIcon: "target", label: "Circles", isSelected: selectedTab == 2) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedTab = 2
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 4)
+                FindMyStyleBottomSheet(
+                    selectedTab: $selectedTab,
+                    isExpanded: $isSheetExpanded
+                )
             }
             }
         }
