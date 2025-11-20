@@ -143,6 +143,227 @@ struct UserProfile {
     }
 }
 
+// MARK: - Find My Style Bottom Sheet
+struct FindMyStyleBottomSheet: View {
+    @Binding var selectedTab: Int
+    @Binding var isExpanded: Bool
+    
+    @State private var dragOffset: CGFloat = 0
+    
+    private let collapsedHeight: CGFloat = 80
+    private var expandedHeight: CGFloat {
+        UIScreen.main.bounds.height * 0.65
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Drag handle
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color(.systemGray3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            
+            // Tab bar
+            HStack(spacing: 0) {
+                TabBarButton(
+                    icon: "house",
+                    selectedIcon: "house.fill",
+                    label: "Home",
+                    isSelected: selectedTab == 0
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        selectedTab = 0
+                        isExpanded = true
+                    }
+                }
+                
+                TabBarButton(
+                    icon: "circle.fill",
+                    selectedIcon: "circle.fill",
+                    label: "Circles",
+                    isSelected: selectedTab == 1
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        selectedTab = 1
+                        isExpanded = false
+                    }
+                }
+                
+                TabBarButton(
+                    icon: "target",
+                    selectedIcon: "target",
+                    label: "Circles",
+                    isSelected: selectedTab == 2
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        selectedTab = 2
+                        isExpanded = true
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+            
+            // Expandable content
+            if isExpanded {
+                Divider()
+                    .padding(.top, 8)
+                
+                ScrollView {
+                    Group {
+                        switch selectedTab {
+                        case 0:
+                            HomeSheetContent()
+                        case 2:
+                            ChallengesSheetContent()
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+                .frame(height: expandedHeight - collapsedHeight - 30)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: isExpanded ? expandedHeight : collapsedHeight)
+        .background {
+            Rectangle()
+                .fill(.thinMaterial)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 20, y: -5)
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    let translation = value.translation.height
+                    
+                    if isExpanded && translation > 0 {
+                        dragOffset = translation
+                    } else if !isExpanded && translation < 0 {
+                        dragOffset = translation
+                    }
+                }
+                .onEnded { value in
+                    let velocity = value.predictedEndTranslation.height
+                    let threshold: CGFloat = 80
+                    
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        if !isExpanded && (dragOffset < -threshold || velocity < -200) {
+                            isExpanded = true
+                        } else if isExpanded && (dragOffset > threshold || velocity > 200) {
+                            isExpanded = false
+                        }
+                        
+                        dragOffset = 0
+                    }
+                }
+        )
+    }
+}
+
+// Home Sheet Content
+struct HomeSheetContent: View {
+    @StateObject private var healthKitManager = HealthKitManager.shared
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Good \(timeOfDay)")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    
+                    Text(UIDevice.current.name)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Today's Progress")
+                    .font(.headline)
+                    .padding(.horizontal, 20)
+                
+                HStack(spacing: 16) {
+                    CompactStatCard(title: "Steps", value: "\(healthKitManager.todaysSteps)", icon: "figure.walk", color: .green)
+                    CompactStatCard(title: "Sleep", value: String(format: "%.1fh", healthKitManager.todaysSleepHours), icon: "bed.double", color: .purple)
+                    CompactStatCard(title: "Hangouts", value: "2", icon: "person.2.fill", color: .blue)
+                }
+                .padding(.horizontal, 20)
+            }
+            
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+    
+    private var timeOfDay: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "Morning"
+        case 12..<17: return "Afternoon"
+        case 17..<21: return "Evening"
+        default: return "Night"
+        }
+    }
+}
+
+// Challenges Sheet Content
+struct ChallengesSheetContent: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Text("Challenges")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+                Image(systemName: "plus.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.blue)
+            }
+            .padding(.horizontal, 20)
+            
+            Text("No active challenges")
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+}
+
+// Compact Stat Card
+struct CompactStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            Text(value)
+                .font(.headline)
+                .fontWeight(.bold)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
 // MARK: - Models
 struct User: Identifiable, Hashable, Equatable {
     let id = UUID()
