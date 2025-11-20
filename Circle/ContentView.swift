@@ -147,126 +147,152 @@ struct UserProfile {
 struct FindMyStyleBottomSheet: View {
     @Binding var selectedTab: Int
     @Binding var isExpanded: Bool
+    @Binding var blurAmount: CGFloat  // Pass blur amount back to parent
     
-    @State private var dragOffset: CGFloat = 0
+    @State private var currentHeight: CGFloat = 60  // Start collapsed - slimmer!
+    @GestureState private var dragState: CGFloat = 0
     
-    private let pillHeight: CGFloat = 70
-    private var contentHeight: CGFloat {
-        UIScreen.main.bounds.height * 0.6
+    private let collapsedHeight: CGFloat = 60  // Slimmer collapsed height
+    private var expandedHeight: CGFloat {
+        UIScreen.main.bounds.height * 0.65
+    }
+    
+    // Calculate current total height (base + drag offset)
+    private var totalHeight: CGFloat {
+        let height = currentHeight + dragState
+        // Clamp between collapsed and expanded
+        return max(collapsedHeight, min(expandedHeight, height))
+    }
+    
+    // Calculate expansion progress (0 = collapsed, 1 = expanded)
+    var expansionProgress: CGFloat {
+        let progress = (totalHeight - collapsedHeight) / (expandedHeight - collapsedHeight)
+        return max(0, min(1, progress))
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Expanded content (above the pill)
-            if isExpanded {
-                ScrollView {
-                    Group {
-                        switch selectedTab {
-                        case 0:
-                            HomeSheetContent()
-                        case 2:
-                            ChallengesSheetContent()
-                        default:
-                            EmptyView()
-                        }
-                    }
-                    .padding(.top, 20)
-                    .padding(.bottom, 20)
-                }
-                .frame(height: contentHeight)
-                .background {
-                    Rectangle()
-                        .fill(.ultraThinMaterial.opacity(0.7))  // More transparent
-                }
-            }
-            
-            // Fixed pill at bottom (stays in place)
+        GeometryReader { geometry in
             VStack(spacing: 0) {
-                // Drag handle
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color(.systemGray3))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
-                
-                // Tab bar
-                HStack(spacing: 0) {
-                    TabBarButton(
-                        icon: "house",
-                        selectedIcon: "house.fill",
-                        label: "Home",
-                        isSelected: selectedTab == 0
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                // Everything wrapped in one unified pill shape!
+                VStack(spacing: 0) {
+                    // Drag handle at TOP
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(Color(.systemGray3))
+                        .frame(width: 36, height: 4)
+                        .padding(.top, 8)
+                        .padding(.bottom, 6)
+                    
+                    // Expandable content area (slides out from pill)
+                    if totalHeight > collapsedHeight + 10 {
+                        ScrollView {
+                            Group {
+                                switch selectedTab {
+                                case 0:
+                                    HomeSheetContent()
+                                case 2:
+                                    ChallengesSheetContent()
+                                default:
+                                    EmptyView()
+                                }
+                            }
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
+                            .padding(.horizontal, 16)
+                        }
+                        .frame(height: totalHeight - collapsedHeight - 30)
+                        .opacity(expansionProgress)  // Fade in as you drag up
+                    }
+                    
+                    // Tab bar at bottom - more compact
+                    HStack(spacing: 0) {
+                        TabBarButton(
+                            icon: "house",
+                            selectedIcon: "house.fill",
+                            label: "Home",
+                            isSelected: selectedTab == 0
+                        ) {
                             selectedTab = 0
-                            isExpanded = true
-                        }
-                    }
-                    
-                    TabBarButton(
-                        icon: "circle.fill",
-                        selectedIcon: "circle.fill",
-                        label: "Circles",
-                        isSelected: selectedTab == 1
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            selectedTab = 1
-                            isExpanded = false
-                        }
-                    }
-                    
-                    TabBarButton(
-                        icon: "target",
-                        selectedIcon: "target",
-                        label: "Circles",
-                        isSelected: selectedTab == 2
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            selectedTab = 2
-                            isExpanded = true
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-            .frame(height: pillHeight)
-            .frame(maxWidth: .infinity)
-            .background {
-                // More transparent glass effect
-                Capsule()  // Pill shape
-                    .fill(.ultraThinMaterial.opacity(0.85))
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-            .shadow(color: .black.opacity(0.1), radius: 10, y: -2)
-        }
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    let translation = value.translation.height
-                    
-                    if isExpanded && translation > 0 {
-                        dragOffset = translation
-                    } else if !isExpanded && translation < 0 {
-                        dragOffset = translation
-                    }
-                }
-                .onEnded { value in
-                    let velocity = value.predictedEndTranslation.height
-                    let threshold: CGFloat = 50
-                    
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        if !isExpanded && (dragOffset < -threshold || velocity < -200) {
-                            isExpanded = true
-                        } else if isExpanded && (dragOffset > threshold || velocity > 200) {
-                            isExpanded = false
+                            // Don't auto-expand, let user drag
                         }
                         
-                        dragOffset = 0
+                        TabBarButton(
+                            icon: "circle.fill",
+                            selectedIcon: "circle.fill",
+                            label: "Circles",
+                            isSelected: selectedTab == 1
+                        ) {
+                            selectedTab = 1
+                            // Auto-collapse when switching to Circles
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                currentHeight = collapsedHeight
+                                isExpanded = false
+                            }
+                        }
+                        
+                        TabBarButton(
+                            icon: "target",
+                            selectedIcon: "target",
+                            label: "Challenges",
+                            isSelected: selectedTab == 2
+                        ) {
+                            selectedTab = 2
+                            // Don't auto-expand, let user drag
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
                 }
-        )
+                .background {
+                    // ONE unified background for the entire sheet - more opaque!
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)  // More rounded for pill look
+                        .fill(.ultraThinMaterial.opacity(0.98))  // Much more opaque!
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 15, y: -5)
+                .padding(.horizontal, 20)  // More horizontal padding for slimmer look
+                .padding(.bottom, 8)
+            }
+            .frame(height: totalHeight)
+            .frame(maxWidth: .infinity)
+            .position(x: geometry.size.width / 2, y: geometry.size.height - totalHeight / 2)  // Position from bottom
+            .gesture(
+                // Smooth drag gesture - follows your finger!
+                DragGesture()
+                    .updating($dragState) { value, state, _ in
+                        // Update drag state in real-time as you drag
+                        state = -value.translation.height  // Negative because dragging up
+                    }
+                    .onEnded { value in
+                        let velocity = -value.predictedEndTranslation.height
+                        let finalHeight = currentHeight + (-value.translation.height)
+                        
+                        // Snap to nearest position based on where you release
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            let midPoint = (collapsedHeight + expandedHeight) / 2
+                            
+                            if finalHeight > midPoint || velocity > 500 {
+                                // Snap to expanded
+                                currentHeight = expandedHeight
+                                isExpanded = true
+                            } else {
+                                // Snap to collapsed
+                                currentHeight = collapsedHeight
+                                isExpanded = false
+                            }
+                        }
+                    }
+            )
+            .onChange(of: isExpanded) { newValue in
+                // Sync height when isExpanded changes externally
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    currentHeight = newValue ? expandedHeight : collapsedHeight
+                }
+            }
+            .onChange(of: expansionProgress) { newProgress in
+                // Update blur amount in real-time as you drag
+                blurAmount = newProgress * 15  // 0 to 15 blur radius
+            }
+        }  // Close GeometryReader
     }
 }
 
@@ -1672,6 +1698,7 @@ struct ContentView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "onboarding_complete")
     @State private var isSheetExpanded = false
+    @State private var blurAmount: CGFloat = 0  // Progressive blur based on drag
     
     var body: some View {
         Group {
@@ -1702,10 +1729,8 @@ struct ContentView: View {
             } else {
                 // Main app interface
         ZStack {
-            // Content area - always show Circles map
+            // Content area - always show Circles map (NO BLUR - transparency is enough!)
             CirclesView()
-                .blur(radius: isSheetExpanded ? 15 : 0)  // Heavier blur when sheet is up (Find My style)
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSheetExpanded)
                 .allowsHitTesting(!isSheetExpanded)  // Disable interaction when sheet is expanded
             
             // Draggable bottom sheet with tabs (Find My style)
@@ -1713,7 +1738,8 @@ struct ContentView: View {
                 Spacer()
                 FindMyStyleBottomSheet(
                     selectedTab: $selectedTab,
-                    isExpanded: $isSheetExpanded
+                    isExpanded: $isSheetExpanded,
+                    blurAmount: $blurAmount  // Still track for future use
                 )
             }
             }
