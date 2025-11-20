@@ -150,66 +150,15 @@ struct FindMyStyleBottomSheet: View {
     
     @State private var dragOffset: CGFloat = 0
     
-    private let collapsedHeight: CGFloat = 80
-    private var expandedHeight: CGFloat {
-        UIScreen.main.bounds.height * 0.65
+    private let pillHeight: CGFloat = 70
+    private var contentHeight: CGFloat {
+        UIScreen.main.bounds.height * 0.6
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Drag handle
-            RoundedRectangle(cornerRadius: 2.5)
-                .fill(Color(.systemGray3))
-                .frame(width: 36, height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
-            
-            // Tab bar
-            HStack(spacing: 0) {
-                TabBarButton(
-                    icon: "house",
-                    selectedIcon: "house.fill",
-                    label: "Home",
-                    isSelected: selectedTab == 0
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        selectedTab = 0
-                        isExpanded = true
-                    }
-                }
-                
-                TabBarButton(
-                    icon: "circle.fill",
-                    selectedIcon: "circle.fill",
-                    label: "Circles",
-                    isSelected: selectedTab == 1
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        selectedTab = 1
-                        isExpanded = false
-                    }
-                }
-                
-                TabBarButton(
-                    icon: "target",
-                    selectedIcon: "target",
-                    label: "Circles",
-                    isSelected: selectedTab == 2
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        selectedTab = 2
-                        isExpanded = true
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 12)
-            
-            // Expandable content
+            // Expanded content (above the pill)
             if isExpanded {
-                Divider()
-                    .padding(.top, 8)
-                
                 ScrollView {
                     Group {
                         switch selectedTab {
@@ -221,20 +170,77 @@ struct FindMyStyleBottomSheet: View {
                             EmptyView()
                         }
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 20)
+                    .padding(.bottom, 20)
                 }
-                .frame(height: expandedHeight - collapsedHeight - 30)
+                .frame(height: contentHeight)
+                .background {
+                    Rectangle()
+                        .fill(.ultraThinMaterial.opacity(0.7))  // More transparent
+                }
             }
+            
+            // Fixed pill at bottom (stays in place)
+            VStack(spacing: 0) {
+                // Drag handle
+                RoundedRectangle(cornerRadius: 2.5)
+                    .fill(Color(.systemGray3))
+                    .frame(width: 40, height: 5)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                
+                // Tab bar
+                HStack(spacing: 0) {
+                    TabBarButton(
+                        icon: "house",
+                        selectedIcon: "house.fill",
+                        label: "Home",
+                        isSelected: selectedTab == 0
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedTab = 0
+                            isExpanded = true
+                        }
+                    }
+                    
+                    TabBarButton(
+                        icon: "circle.fill",
+                        selectedIcon: "circle.fill",
+                        label: "Circles",
+                        isSelected: selectedTab == 1
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedTab = 1
+                            isExpanded = false
+                        }
+                    }
+                    
+                    TabBarButton(
+                        icon: "target",
+                        selectedIcon: "target",
+                        label: "Circles",
+                        isSelected: selectedTab == 2
+                    ) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedTab = 2
+                            isExpanded = true
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+            .frame(height: pillHeight)
+            .frame(maxWidth: .infinity)
+            .background {
+                // More transparent glass effect
+                Capsule()  // Pill shape
+                    .fill(.ultraThinMaterial.opacity(0.85))
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+            .shadow(color: .black.opacity(0.1), radius: 10, y: -2)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: isExpanded ? expandedHeight : collapsedHeight)
-        .background {
-            Rectangle()
-                .fill(.thinMaterial)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 20, y: -5)
-        .offset(y: dragOffset)
         .gesture(
             DragGesture()
                 .onChanged { value in
@@ -248,7 +254,7 @@ struct FindMyStyleBottomSheet: View {
                 }
                 .onEnded { value in
                     let velocity = value.predictedEndTranslation.height
-                    let threshold: CGFloat = 80
+                    let threshold: CGFloat = 50
                     
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         if !isExpanded && (dragOffset < -threshold || velocity < -200) {
