@@ -172,116 +172,145 @@ struct FindMyStyleBottomSheet: View {
     
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
-                // Everything wrapped in one unified pill shape!
-                VStack(spacing: 0) {
-                    // Drag handle at TOP
-                    RoundedRectangle(cornerRadius: 2.5)
-                        .fill(Color(.systemGray3))
-                        .frame(width: 36, height: 4)
-                        .padding(.top, 8)
-                        .padding(.bottom, 6)
-                    
-                    // Expandable content area (slides out from pill)
-                    if totalHeight > collapsedHeight + 10 {
+            ZStack(alignment: .bottom) {
+                // Expandable content area (slides up from above tab bar)
+                if totalHeight > collapsedHeight + 10 {
+                    VStack(spacing: 0) {
+                        // Drag handle at TOP of content - this is draggable
+                        RoundedRectangle(cornerRadius: 2.5)
+                            .fill(Color(.systemGray3))
+                            .frame(width: 36, height: 4)
+                            .padding(.top, 8)
+                            .padding(.bottom, 6)
+                            .gesture(
+                                // Drag gesture on handle only
+                                DragGesture()
+                                    .updating($dragState) { value, state, _ in
+                                        state = -value.translation.height
+                                    }
+                                    .onEnded { value in
+                                        let velocity = -value.predictedEndTranslation.height
+                                        let finalHeight = currentHeight + (-value.translation.height)
+                                        
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                            let midPoint = (collapsedHeight + expandedHeight) / 2
+                                            
+                                            if finalHeight > midPoint || velocity > 500 {
+                                                currentHeight = expandedHeight
+                                                isExpanded = true
+                                            } else {
+                                                currentHeight = collapsedHeight
+                                                isExpanded = false
+                                            }
+                                        }
+                                    }
+                            )
+                        
                         ScrollView {
                             Group {
                                 switch selectedTab {
                                 case 0:
                                     HomeSheetContent()
+                                        .padding(.horizontal, 16)
+                                case 1:
+                                    CirclesSheetContent()  // People list!
+                                        .padding(.horizontal, 8)
                                 case 2:
                                     ChallengesSheetContent()
+                                        .padding(.horizontal, 16)
                                 default:
                                     EmptyView()
                                 }
                             }
                             .padding(.top, 8)
                             .padding(.bottom, 20)
-                            .padding(.horizontal, 16)
                         }
                         .frame(height: totalHeight - collapsedHeight - 30)
-                        .opacity(expansionProgress)  // Fade in as you drag up
+                    }
+                    .opacity(expansionProgress)  // Fade in as you drag up
+                    .background {
+                        RoundedRectangle(cornerRadius: 30, style: .continuous)
+                            .fill(.ultraThinMaterial.opacity(0.98))
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                    .shadow(color: .black.opacity(0.15), radius: 15, y: -5)
+                    .padding(.horizontal, 8)
+                    .frame(height: totalHeight - collapsedHeight)
+                    .offset(y: -(totalHeight - collapsedHeight))  // Position just above tab bar, slides up
+                }
+                
+                // Tab bar at bottom - FIXED POSITION (never moves)
+                HStack(spacing: 0) {
+                    TabBarButton(
+                        icon: "house",
+                        selectedIcon: "house.fill",
+                        label: "Home",
+                        isSelected: selectedTab == 0
+                    ) {
+                        selectedTab = 0
+                        // Don't auto-expand, let user drag
                     }
                     
-                    // Tab bar at bottom - more compact
-                    HStack(spacing: 0) {
-                        TabBarButton(
-                            icon: "house",
-                            selectedIcon: "house.fill",
-                            label: "Home",
-                            isSelected: selectedTab == 0
-                        ) {
-                            selectedTab = 0
-                            // Don't auto-expand, let user drag
-                        }
-                        
-                        TabBarButton(
-                            icon: "circle.fill",
-                            selectedIcon: "circle.fill",
-                            label: "Circles",
-                            isSelected: selectedTab == 1
-                        ) {
-                            selectedTab = 1
-                            // Auto-collapse when switching to Circles
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                currentHeight = collapsedHeight
-                                isExpanded = false
-                            }
-                        }
-                        
-                        TabBarButton(
-                            icon: "target",
-                            selectedIcon: "target",
-                            label: "Challenges",
-                            isSelected: selectedTab == 2
-                        ) {
-                            selectedTab = 2
-                            // Don't auto-expand, let user drag
-                        }
+                    TabBarButton(
+                        icon: "circle.fill",
+                        selectedIcon: "circle.fill",
+                        label: "Circles",
+                        isSelected: selectedTab == 1
+                    ) {
+                        selectedTab = 1
+                        // Don't auto-expand, let user drag to see People list
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
+                    
+                    TabBarButton(
+                        icon: "target",
+                        selectedIcon: "target",
+                        label: "Challenges",
+                        isSelected: selectedTab == 2
+                    ) {
+                        selectedTab = 2
+                        // Don't auto-expand, let user drag
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
                 .background {
-                    // ONE unified background for the entire sheet - more opaque!
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)  // More rounded for pill look
-                        .fill(.ultraThinMaterial.opacity(0.98))  // Much more opaque!
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(.ultraThinMaterial.opacity(0.98))
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                 .shadow(color: .black.opacity(0.15), radius: 15, y: -5)
-                .padding(.horizontal, 20)  // More horizontal padding for slimmer look
+                .padding(.horizontal, 8)
                 .padding(.bottom, 8)
-            }
-            .frame(height: totalHeight)
-            .frame(maxWidth: .infinity)
-            .position(x: geometry.size.width / 2, y: geometry.size.height - totalHeight / 2)  // Position from bottom
-            .gesture(
-                // Smooth drag gesture - follows your finger!
-                DragGesture()
-                    .updating($dragState) { value, state, _ in
-                        // Update drag state in real-time as you drag
-                        state = -value.translation.height  // Negative because dragging up
-                    }
-                    .onEnded { value in
-                        let velocity = -value.predictedEndTranslation.height
-                        let finalHeight = currentHeight + (-value.translation.height)
-                        
-                        // Snap to nearest position based on where you release
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            let midPoint = (collapsedHeight + expandedHeight) / 2
+                .frame(height: collapsedHeight)
+                .gesture(
+                    // Smooth drag gesture on tab bar - content expands upward, tab bar stays fixed
+                    DragGesture()
+                        .updating($dragState) { value, state, _ in
+                            // Update drag state in real-time as you drag
+                            state = -value.translation.height  // Negative because dragging up
+                        }
+                        .onEnded { value in
+                            let velocity = -value.predictedEndTranslation.height
+                            let finalHeight = currentHeight + (-value.translation.height)
                             
-                            if finalHeight > midPoint || velocity > 500 {
-                                // Snap to expanded
-                                currentHeight = expandedHeight
-                                isExpanded = true
-                            } else {
-                                // Snap to collapsed
-                                currentHeight = collapsedHeight
-                                isExpanded = false
+                            // Snap to nearest position based on where you release
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                let midPoint = (collapsedHeight + expandedHeight) / 2
+                                
+                                if finalHeight > midPoint || velocity > 500 {
+                                    // Snap to expanded
+                                    currentHeight = expandedHeight
+                                    isExpanded = true
+                                } else {
+                                    // Snap to collapsed
+                                    currentHeight = collapsedHeight
+                                    isExpanded = false
+                                }
                             }
                         }
-                    }
-            )
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: isExpanded) { newValue in
                 // Sync height when isExpanded changes externally
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -307,11 +336,6 @@ struct HomeSheetContent: View {
                     Text("Good \(timeOfDay)")
                         .font(.title2)
                         .fontWeight(.medium)
-                    
-                    Text(UIDevice.current.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
                 }
                 Spacer()
             }
@@ -347,6 +371,194 @@ struct HomeSheetContent: View {
 }
 
 // Challenges Sheet Content
+// Circles Sheet Content - People List
+struct CirclesSheetContent: View {
+    @StateObject private var locationManager = LocalLocationManager()
+    @StateObject private var seamlessLocation = SeamlessLocationManager.shared
+    @StateObject private var seamlessAuth = SeamlessAuthManager.shared
+    @StateObject private var contactDiscovery = ContactDiscoveryManager.shared
+    
+    @State private var circleMembers: [User] = []
+    @State private var selectedPerson: User?
+    @State private var hasStartedLocationUpdates = false
+    @State private var isUsingMockData = false
+    
+    var body: some View {
+        Group {
+            if let selected = selectedPerson {
+                PersonDetailContent(person: selected, userLocation: locationManager.currentLocation) {
+                    selectedPerson = nil
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    sheetHeader
+                    
+                    if circleMembers.isEmpty {
+                        peopleEmptyState
+                    } else {
+                        peopleList
+                    }
+                }
+            }
+        }
+        .background(Color.clear)
+        .onAppear {
+            startTrackingIfNeeded()
+            refreshMembers()
+        }
+        .onReceive(seamlessLocation.$friendsLocations) { _ in
+            refreshMembers()
+        }
+        .onReceive(locationManager.$currentLocation) { _ in
+            refreshMembers()
+        }
+    }
+    
+    private var sheetHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("People")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            Text(statusSubtitle)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 4)
+    }
+    
+    private var peopleList: some View {
+        VStack(spacing: 0) {
+            ForEach(circleMembers) { person in
+                Button(action: {
+                    selectedPerson = person
+                }) {
+                    PersonRow(person: person, userLocation: locationManager.currentLocation)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                if person.id != circleMembers.last?.id {
+                    Divider()
+                        .padding(.leading, 60)
+                }
+            }
+        }
+    }
+    
+    private var peopleEmptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "person.2.circle.fill")
+                .font(.system(size: 42))
+                .foregroundColor(.secondary)
+            
+            Text("No shared locations yet")
+                .font(.subheadline)
+                .fontWeight(.medium)
+            
+            Text("Ask friends to accept your invite or enable sharing to see them here.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity)
+    }
+    
+    private var statusSubtitle: String {
+        if isUsingMockData {
+            return "Showing demo people until live locations arrive"
+        }
+        
+        if let lastUpdate = seamlessLocation.lastUpdate {
+            return "Updated \(relativeTimeString(from: lastUpdate))"
+        }
+        
+        return seamlessLocation.isSharing ? "Waiting for live location updates…" : "Location sharing paused"
+    }
+    
+    private func startTrackingIfNeeded() {
+        guard !hasStartedLocationUpdates else { return }
+        hasStartedLocationUpdates = true
+        
+        locationManager.requestLocationPermission()
+        locationManager.startLocationUpdates { _ in }
+        
+        if !seamlessLocation.isSharing {
+            seamlessLocation.autoStart()
+        }
+        
+        if contactDiscovery.discoveredFriends.isEmpty {
+            Task {
+                try? await contactDiscovery.discoverFriendsFromContacts()
+            }
+        }
+    }
+    
+    private func refreshMembers() {
+        var members: [User] = []
+        
+        if let coordinate = locationManager.currentLocation?.coordinate {
+            let displayName = seamlessAuth.displayName ?? "You"
+            members.append(
+                User(
+                    name: displayName,
+                    location: coordinate,
+                    profileEmoji: "👤",
+                    lastSeen: Date()
+                )
+            )
+        }
+        
+        let friendLocations = seamlessLocation.friendsLocations.values
+        
+        if friendLocations.isEmpty {
+            if members.isEmpty {
+                circleMembers = loadMockPeople()
+                isUsingMockData = true
+            } else {
+                circleMembers = members
+                isUsingMockData = false
+            }
+            return
+        }
+        
+        let sortedFriends = friendLocations.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
+        
+        sortedFriends.forEach { friend in
+            members.append(
+                User(
+                    name: friend.displayName,
+                    location: friend.coordinate,
+                    profileEmoji: "👥",
+                    lastSeen: friend.timestamp
+                )
+            )
+        }
+        
+        circleMembers = members
+        isUsingMockData = false
+    }
+    
+    private func loadMockPeople() -> [User] {
+        let userLat = locationManager.currentLocation?.coordinate.latitude ?? 37.7749
+        let userLon = locationManager.currentLocation?.coordinate.longitude ?? -122.4194
+        let offset = 0.01
+        let now = Date()
+        
+        return [
+            User(name: "You", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon), profileEmoji: "👤", lastSeen: now),
+            User(name: "Sarah Johnson", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon - offset), profileEmoji: "👩‍💼", lastSeen: now.addingTimeInterval(-300)),
+            User(name: "Mike Chen", location: CLLocationCoordinate2D(latitude: userLat - offset, longitude: userLon + offset), profileEmoji: "👨‍💻", lastSeen: now.addingTimeInterval(-600)),
+            User(name: "Josh Williams", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon - (offset * 2)), profileEmoji: "👨‍🎨", lastSeen: now.addingTimeInterval(-900)),
+            User(name: "Emma Davis", location: CLLocationCoordinate2D(latitude: userLat + (offset * 2), longitude: userLon), profileEmoji: "👩‍🎓", lastSeen: now.addingTimeInterval(-1500)),
+            User(name: "Alex Martinez", location: CLLocationCoordinate2D(latitude: userLat - (offset * 1.5), longitude: userLon - offset), profileEmoji: "👨‍🍳", lastSeen: now.addingTimeInterval(-2100)),
+            User(name: "Lisa Anderson", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon + (offset * 1.5)), profileEmoji: "👩‍⚕️", lastSeen: now.addingTimeInterval(-3600))
+        ]
+    }
+}
+
 struct ChallengesSheetContent: View {
     var body: some View {
         VStack(spacing: 20) {
@@ -355,9 +567,15 @@ struct ChallengesSheetContent: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 Spacer()
-                Image(systemName: "plus.circle.fill")
-                    .font(.title)
-                    .foregroundColor(.blue)
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))  // Just slightly more opaque than background
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                }
             }
             .padding(.horizontal, 20)
             
@@ -402,11 +620,13 @@ struct User: Identifiable, Hashable, Equatable {
     let name: String
     let location: CLLocationCoordinate2D?
     let profileEmoji: String?
+    let lastSeen: Date?
     
-    init(name: String, location: CLLocationCoordinate2D?, profileEmoji: String? = nil) {
+    init(name: String, location: CLLocationCoordinate2D?, profileEmoji: String? = nil, lastSeen: Date? = nil) {
         self.name = name
         self.location = location
         self.profileEmoji = profileEmoji ?? "👤"
+        self.lastSeen = lastSeen
     }
     
     func hash(into hasher: inout Hasher) {
@@ -417,6 +637,12 @@ struct User: Identifiable, Hashable, Equatable {
     static func == (lhs: User, rhs: User) -> Bool {
         return lhs.id == rhs.id && lhs.name == rhs.name
     }
+}
+
+fileprivate func relativeTimeString(from date: Date) -> String {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .full
+    return formatter.localizedString(for: date, relativeTo: Date())
 }
 
 struct HangoutSession: Identifiable, Hashable, Equatable {
@@ -1368,7 +1594,7 @@ struct FriendDetailSheet: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        Text("Updated 1 minute ago")
+                        Text(friend.lastSeen.map { "Updated \(relativeTimeString(from: $0))" } ?? "Waiting for location update")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -2016,7 +2242,7 @@ struct ChallengeCard: View {
     }
 }
 
-// Placeholder views for other tabs
+// Circles View - Map View
 struct CirclesView: View {
     @StateObject private var locationManager = LocalLocationManager()
     @StateObject private var hangoutEngine = HangoutEngine.shared
@@ -2032,44 +2258,39 @@ struct CirclesView: View {
     @State private var circleMembers: [User] = []
     @State private var activeHangouts: [HangoutSession] = []
     @State private var weeklyHangouts: [HangoutSession] = []
-    @State private var useRealFriends = true // Toggle between real and mock data
+    @State private var useRealFriends = true
     
     var body: some View {
         NavigationView {
             Group {
                 if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
-                    // No location permission fallback
                     NoLocationPermissionView()
                 } else {
-                    // Main map view - ALWAYS show map with friends
+                    // Main map view
                     ZStack {
-                        // Custom MapKit Map View with proper overlays
                         CustomMapView(
                             region: $region,
                             circleMembers: circleMembers,
                             activeHangouts: activeHangouts,
                             weeklyHangouts: weeklyHangouts,
                             onFriendTap: { friend in
-                                print("🎯 onFriendTap called for: \(friend.name)")
                                 selectedFriend = friend
                             }
                         )
                         .ignoresSafeArea(.all, edges: .all)
                         .onAppear {
                             setupLocationTracking()
-                            // Delay loading circle data until we have location
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                 loadCircleData()
                             }
                             
-                            // Refresh circle data every 10 seconds
                             Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
                                 loadCircleData()
                             }
                         }
                         
-                        // Stats Overlay (screen overlay)
-            VStack {
+                        // Stats Overlay
+                        VStack {
                             HStack {
                                 Spacer()
                                 StatsOverlayCard(
@@ -2078,7 +2299,7 @@ struct CirclesView: View {
                                 )
                                 .padding(.trailing, 16)
                             }
-                            .padding(.top, 60) // Move below Dynamic Island
+                            .padding(.top, 60)
                             
                             Spacer()
                         }
@@ -2090,18 +2311,13 @@ struct CirclesView: View {
             .navigationBarHidden(true)
             .sheet(item: $selectedFriend) { friend in
                 FriendDetailSheet(friend: friend)
-                    .onAppear {
-                        print("🎯 Sheet presenting for: \(friend.name)")
-                    }
             }
         }
         .onAppear {
-            // Auto-start location sharing (seamless)
             if !seamlessLocation.isSharing {
                 seamlessLocation.autoStart()
             }
             
-            // Discover friends from contacts (one-time)
             if contactDiscovery.discoveredFriends.isEmpty {
                 Task {
                     try? await contactDiscovery.discoverFriendsFromContacts()
@@ -2118,26 +2334,19 @@ struct CirclesView: View {
     }
     
     private func loadCircleData() {
-        // Check if we have real friends to display
         if useRealFriends && !seamlessLocation.friendsLocations.isEmpty {
             loadRealFriends()
         } else {
             loadMockFriends()
         }
         
-        // Load hangout data
         activeHangouts = hangoutEngine.getActiveHangouts()
         weeklyHangouts = hangoutEngine.getWeeklyHangouts()
-        
-        print("👥 Active hangouts: \(activeHangouts.count), Weekly hangouts: \(weeklyHangouts.count)")
     }
     
     private func loadRealFriends() {
-        print("📱 Loading REAL friends from contacts")
-        
         var members: [User] = []
         
-        // Add yourself
         if let location = locationManager.currentLocation?.coordinate {
             let displayName = seamlessAuth.displayName ?? "You"
             members.append(User(
@@ -2145,46 +2354,347 @@ struct CirclesView: View {
                 location: location,
                 profileEmoji: "👤"
             ))
-            print("✅ Added you: \(location.latitude), \(location.longitude)")
         }
         
-        // Add discovered friends with their locations
-        for (userID, friendLocation) in seamlessLocation.friendsLocations {
+        for (_, friendLocation) in seamlessLocation.friendsLocations {
             members.append(User(
                 name: friendLocation.displayName,
                 location: friendLocation.coordinate,
                 profileEmoji: "👥"
             ))
-            print("✅ Added friend: \(friendLocation.displayName) at \(friendLocation.latitude), \(friendLocation.longitude)")
         }
         
         circleMembers = members
-        print("📍 Loaded \(circleMembers.count) people from contacts (including you)")
     }
     
     private func loadMockFriends() {
-        print("🧪 Loading MOCK friends for testing")
-        
-        // Get user's current location or use default
         let userLat = locationManager.currentLocation?.coordinate.latitude ?? 37.7749
         let userLon = locationManager.currentLocation?.coordinate.longitude ?? -122.4194
         
-        print("🗺️ Loading circle data at location: \(userLat), \(userLon)")
-        
-        // Create mock friends relative to user's location (within ~5km radius)
-        let offset = 0.01 // Roughly 1km offset
+        let offset = 0.01
         
         circleMembers = [
             User(name: "You", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon), profileEmoji: "👤"),
-            User(name: "Sarah", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon - offset), profileEmoji: "👩‍💼"),
-            User(name: "Mike", location: CLLocationCoordinate2D(latitude: userLat - offset, longitude: userLon + offset), profileEmoji: "👨‍💻"),
-            User(name: "Josh", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon - (offset * 2)), profileEmoji: "👨‍🎨"),
-            User(name: "Emma", location: CLLocationCoordinate2D(latitude: userLat + (offset * 2), longitude: userLon), profileEmoji: "👩‍🎓"),
-            User(name: "Alex", location: CLLocationCoordinate2D(latitude: userLat - (offset * 1.5), longitude: userLon - offset), profileEmoji: "👨‍🍳"),
-            User(name: "Lisa", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon + (offset * 1.5)), profileEmoji: "👩‍⚕️")
+            User(name: "Sarah Johnson", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon - offset), profileEmoji: "👩‍💼"),
+            User(name: "Mike Chen", location: CLLocationCoordinate2D(latitude: userLat - offset, longitude: userLon + offset), profileEmoji: "👨‍💻"),
+            User(name: "Josh Williams", location: CLLocationCoordinate2D(latitude: userLat, longitude: userLon - (offset * 2)), profileEmoji: "👨‍🎨"),
+            User(name: "Emma Davis", location: CLLocationCoordinate2D(latitude: userLat + (offset * 2), longitude: userLon), profileEmoji: "👩‍🎓"),
+            User(name: "Alex Martinez", location: CLLocationCoordinate2D(latitude: userLat - (offset * 1.5), longitude: userLon - offset), profileEmoji: "👨‍🍳"),
+            User(name: "Lisa Anderson", location: CLLocationCoordinate2D(latitude: userLat + offset, longitude: userLon + (offset * 1.5)), profileEmoji: "👩‍⚕️")
         ]
+    }
+}
+
+// MARK: - Person Row (Find My Style)
+struct PersonRow: View {
+    let person: User
+    let userLocation: CLLocation?
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Profile picture (emoji in circle)
+            ZStack {
+                Circle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 44, height: 44)
+                
+                Text(person.profileEmoji ?? "👤")
+                    .font(.system(size: 22))
+            }
+            
+            // Name and location info (2 lines)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(person.name)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(.primary)
+                
+                if let location = person.location {
+                    Text(locationInfo(for: location))
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+            
+            // Distance on the right (same size as location info)
+            if let distance = calculateDistance() {
+                Text(distance)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 10)
+        .background(Color.clear)  // Transparent background
+    }
+    
+    private func locationInfo(for coordinate: CLLocationCoordinate2D) -> String {
+        // Format: "Cape Town, Western Cape • 5 hours ago"
+        let cityRegion = cityAndRegion(for: coordinate)
+        let timeAgo = person.lastSeen.map { relativeTimeString(from: $0) } ?? randomTimeAgo()
+        return "\(cityRegion) • \(timeAgo)"
+    }
+    
+    private func cityAndRegion(for coordinate: CLLocationCoordinate2D) -> String {
+        // Mock data - in real app would use reverse geocoding
+        let locations = [
+            "San Francisco, California",
+            "Cape Town, Western Cape",
+            "New York, New York",
+            "Los Angeles, California",
+            "Chicago, Illinois",
+            "Austin, Texas"
+        ]
+        return locations.randomElement() ?? "San Francisco, California"
+    }
+    
+    private func randomTimeAgo() -> String {
+        let times = [
+            "now",
+            "5 minutes ago",
+            "1 hour ago",
+            "2 hours ago",
+            "5 hours ago",
+            "Yesterday"
+        ]
+        return times.randomElement() ?? "now"
+    }
+    
+    private func calculateDistance() -> String? {
+        // If no user location, use default San Francisco location
+        let defaultLocation = CLLocation(latitude: 37.7749, longitude: -122.4194)
+        let userLoc = userLocation ?? defaultLocation
         
-        print("📍 Created \(circleMembers.count) MOCK circle members around user location")
+        guard let personLoc = person.location else {
+            return nil
+        }
+        
+        let personLocation = CLLocation(latitude: personLoc.latitude, longitude: personLoc.longitude)
+        let distanceMeters = userLoc.distance(from: personLocation)
+        
+        // Convert to km
+        if distanceMeters < 1000 {
+            return "\(Int(distanceMeters)) m"
+        } else {
+            let km = distanceMeters / 1000
+            if km < 10 {
+                return String(format: "%.1f km", km)
+            } else {
+                return "\(Int(km)) km"
+            }
+        }
+    }
+}
+
+// MARK: - Person Detail Content (Inline, no sheet)
+struct PersonDetailContent: View {
+    let person: User
+    let userLocation: CLLocation?
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Header section
+                VStack(alignment: .leading, spacing: 8) {
+                    // X button in top right (matching + button style)
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            onDismiss()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 32, height: 32)
+                                
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.black)
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                    .padding(.trailing, 8)
+                    
+                    // Name (large, bold)
+                    Text(person.name)
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 20)
+                    
+                    // Address (detailed)
+                    if let location = person.location {
+                        Text(detailedAddress(for: location))
+                            .font(.system(size: 17))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    // Time ago with star icon
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Text(timeAgo())
+                            .font(.system(size: 15))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                }
+                .padding(.bottom, 24)
+                
+                // Action cards
+                HStack(spacing: 12) {
+                    // Contact card
+                    Button(action: {
+                        openMessages()
+                    }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.brown)
+                            
+                            Text("Contact")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Text("Info")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 100)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Directions card
+                    Button(action: {
+                        openMaps()
+                    }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.blue)
+                            
+                            Text("Directions")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Text(distanceText())
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 100)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+                
+                // Notifications section
+                HStack {
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.red)
+                    
+                    Text("Notifications")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        // Add notification action
+                    }) {
+                        Text("Add")
+                            .font(.system(size: 17))
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+                
+                // Settings section
+                HStack {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Settings")
+                        .font(.system(size: 17))
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .background(Color.clear)
+    }
+    
+    private func detailedAddress(for coordinate: CLLocationCoordinate2D) -> String {
+        // Mock detailed address matching the image format
+        let addresses = [
+            "3 Howe Street, Cape Town, Western Cape, 7925",
+            "456 Market Street, San Francisco, California, 94102",
+            "789 Broadway, New York, New York, 10003",
+            "321 Congress Avenue, Austin, Texas, 78701"
+        ]
+        return addresses.randomElement() ?? "Unknown Location"
+    }
+    
+    private func timeAgo() -> String {
+        let times = [
+            "5 hours ago",
+            "2 hours ago",
+            "1 hour ago",
+            "30 minutes ago",
+            "Just now"
+        ]
+        return times.randomElement() ?? "5 hours ago"
+    }
+    
+    private func distanceText() -> String {
+        guard let userLoc = userLocation,
+              let personLoc = person.location else {
+            return "0 km"
+        }
+        
+        let personLocation = CLLocation(latitude: personLoc.latitude, longitude: personLoc.longitude)
+        let distanceMeters = userLoc.distance(from: personLocation)
+        
+        if distanceMeters < 1000 {
+            return "\(Int(distanceMeters)) m"
+        } else {
+            let km = distanceMeters / 1000
+            if km < 10 {
+                return String(format: "%.1f km", km)
+            } else {
+                return "\(Int(km)) km"
+            }
+        }
+    }
+    
+    private func openMessages() {
+        if let url = URL(string: "sms:") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func openMaps() {
+        guard let location = person.location else { return }
+        
+        let coordinate = "\(location.latitude),\(location.longitude)"
+        if let url = URL(string: "http://maps.apple.com/?daddr=\(coordinate)&dirflg=d") {
+            UIApplication.shared.open(url)
+        }
     }
 }
 
