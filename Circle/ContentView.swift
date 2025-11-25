@@ -172,40 +172,17 @@ struct FindMyStyleBottomSheet: View {
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .bottom) {
-                // Expandable content area (slides up from above tab bar)
-                if totalHeight > collapsedHeight + 10 {
-                    VStack(spacing: 0) {
-                        // Drag handle at TOP of content - this is draggable
-                        RoundedRectangle(cornerRadius: 2.5)
-                            .fill(Color(.systemGray3))
-                            .frame(width: 36, height: 4)
-                            .padding(.top, 8)
-                            .padding(.bottom, 6)
-                            .gesture(
-                                // Drag gesture on handle only
-                                DragGesture()
-                                    .updating($dragState) { value, state, _ in
-                                        state = -value.translation.height
-                                    }
-                                    .onEnded { value in
-                                        let velocity = -value.predictedEndTranslation.height
-                                        let finalHeight = currentHeight + (-value.translation.height)
-                                        
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                            let midPoint = (collapsedHeight + expandedHeight) / 2
-                                            
-                                            if finalHeight > midPoint || velocity > 500 {
-                                                currentHeight = expandedHeight
-                                                isExpanded = true
-                                            } else {
-                                                currentHeight = collapsedHeight
-                                                isExpanded = false
-                                            }
-                                        }
-                                    }
-                            )
-                        
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    // Drag handle always visible (like Find My)
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(Color(.systemGray3))
+                        .frame(width: 36, height: 4)
+                        .padding(.top, 8)
+                        .padding(.bottom, 6)
+                    
+                    // Expandable content that slides out from the pill
+                    if totalHeight > collapsedHeight + 10 {
                         ScrollView {
                             Group {
                                 switch selectedTab {
@@ -213,7 +190,7 @@ struct FindMyStyleBottomSheet: View {
                                     HomeSheetContent()
                                         .padding(.horizontal, 16)
                                 case 1:
-                                    CirclesSheetContent()  // People list!
+                                    CirclesSheetContent()
                                         .padding(.horizontal, 8)
                                 case 2:
                                     ChallengesSheetContent()
@@ -226,102 +203,84 @@ struct FindMyStyleBottomSheet: View {
                             .padding(.bottom, 20)
                         }
                         .frame(height: totalHeight - collapsedHeight - 30)
-                    }
-                    .opacity(expansionProgress)  // Fade in as you drag up
-                    .background {
-                        RoundedRectangle(cornerRadius: 30, style: .continuous)
-                            .fill(.ultraThinMaterial.opacity(0.98))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-                    .shadow(color: .black.opacity(0.15), radius: 15, y: -5)
-                    .padding(.horizontal, 8)
-                    .frame(height: totalHeight - collapsedHeight)
-                    .offset(y: -(totalHeight - collapsedHeight))  // Position just above tab bar, slides up
-                }
-                
-                // Tab bar at bottom - FIXED POSITION (never moves)
-                HStack(spacing: 0) {
-                    TabBarButton(
-                        icon: "house",
-                        selectedIcon: "house.fill",
-                        label: "Home",
-                        isSelected: selectedTab == 0
-                    ) {
-                        selectedTab = 0
-                        // Don't auto-expand, let user drag
+                        .opacity(expansionProgress)
                     }
                     
-                    TabBarButton(
-                        icon: "circle.fill",
-                        selectedIcon: "circle.fill",
-                        label: "Circles",
-                        isSelected: selectedTab == 1
-                    ) {
-                        selectedTab = 1
-                        // Don't auto-expand, let user drag to see People list
+                    // Tab bar
+                    HStack(spacing: 0) {
+                        TabBarButton(
+                            icon: "house",
+                            selectedIcon: "house.fill",
+                            label: "Home",
+                            isSelected: selectedTab == 0
+                        ) {
+                            selectedTab = 0
+                        }
+                        
+                        TabBarButton(
+                            icon: "circle.fill",
+                            selectedIcon: "circle.fill",
+                            label: "Circles",
+                            isSelected: selectedTab == 1
+                        ) {
+                            selectedTab = 1
+                        }
+                        
+                        TabBarButton(
+                            icon: "target",
+                            selectedIcon: "target",
+                            label: "Challenges",
+                            isSelected: selectedTab == 2
+                        ) {
+                            selectedTab = 2
+                        }
                     }
-                    
-                    TabBarButton(
-                        icon: "target",
-                        selectedIcon: "target",
-                        label: "Challenges",
-                        isSelected: selectedTab == 2
-                    ) {
-                        selectedTab = 2
-                        // Don't auto-expand, let user drag
-                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
                 .background {
                     RoundedRectangle(cornerRadius: 30, style: .continuous)
                         .fill(.ultraThinMaterial.opacity(0.98))
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
                 .shadow(color: .black.opacity(0.15), radius: 15, y: -5)
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 20)
                 .padding(.bottom, 8)
-                .frame(height: collapsedHeight)
-                .gesture(
-                    // Smooth drag gesture on tab bar - content expands upward, tab bar stays fixed
-                    DragGesture()
-                        .updating($dragState) { value, state, _ in
-                            // Update drag state in real-time as you drag
-                            state = -value.translation.height  // Negative because dragging up
-                        }
-                        .onEnded { value in
-                            let velocity = -value.predictedEndTranslation.height
-                            let finalHeight = currentHeight + (-value.translation.height)
+            }
+            .frame(height: totalHeight)
+            .frame(maxWidth: .infinity)
+            .position(x: geometry.size.width / 2, y: geometry.size.height - totalHeight / 2)
+            .gesture(
+                DragGesture()
+                    .updating($dragState) { value, state, _ in
+                        state = -value.translation.height
+                    }
+                    .onEnded { value in
+                        let velocity = -value.predictedEndTranslation.height
+                        let finalHeight = currentHeight + (-value.translation.height)
+                        
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            let midPoint = (collapsedHeight + expandedHeight) / 2
                             
-                            // Snap to nearest position based on where you release
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                let midPoint = (collapsedHeight + expandedHeight) / 2
-                                
-                                if finalHeight > midPoint || velocity > 500 {
-                                    // Snap to expanded
-                                    currentHeight = expandedHeight
-                                    isExpanded = true
-                                } else {
-                                    // Snap to collapsed
-                                    currentHeight = collapsedHeight
-                                    isExpanded = false
-                                }
+                            if finalHeight > midPoint || velocity > 500 {
+                                currentHeight = expandedHeight
+                                isExpanded = true
+                            } else {
+                                currentHeight = collapsedHeight
+                                isExpanded = false
                             }
                         }
-                )
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+            )
             .onChange(of: isExpanded) { newValue in
-                // Sync height when isExpanded changes externally
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     currentHeight = newValue ? expandedHeight : collapsedHeight
                 }
             }
             .onChange(of: expansionProgress) { newProgress in
-                // Update blur amount in real-time as you drag
-                blurAmount = newProgress * 15  // 0 to 15 blur radius
+                blurAmount = newProgress * 15
             }
-        }  // Close GeometryReader
+        }
     }
 }
 
